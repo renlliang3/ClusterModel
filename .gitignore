@@ -4,9 +4,10 @@
 # notebooks
 *.ipynb_checkpoints
 
-# Python
+# Python and temporary files
 *~
 *.pyc
 
-# Python
+# Possible hidden files 
 .idea
+
