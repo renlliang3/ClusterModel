@@ -1,4 +1,4 @@
-ClusterModel: package dedicated to provide a model of the thermal and non-thermal gas in the clusters. 
+# ClusterModel: package dedicated to provide a model of the thermal and non-thermal gas in the clusters. 
 
 
 - model.py : 
