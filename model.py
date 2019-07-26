@@ -52,6 +52,7 @@ class Cluster(object):
     
     To do list
     ----------  
+    - Extract astrometric properties of headers when using them instead of just copying it
     - Include cluster metallicity instead of local abundances for nuclear enhancement
     - Compute the X-ray surface brightness
     - Compute the secondary electron/positrons
