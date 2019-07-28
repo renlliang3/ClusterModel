@@ -29,7 +29,7 @@ def set_default_plot_param():
                  'figure.titlesize': 16,
                  'figure.figsize':[8.0, 6.0],
                  'figure.subplot.right':0.97,
-                 'figure.subplot.left':0.15, # Ensure enough space on the left so that all plot can be aligned
+                 'figure.subplot.left':0.18, # Ensure enough space on the left so that all plot can be aligned
                  'font.family':'serif',
                  'figure.facecolor': 'white',
                  'legend.frameon': True}
@@ -145,6 +145,11 @@ def maps(image, header, filename,
                          'figure.subplot.left':0.05})
 
     wcs_map = WCS(header)
+
+    #---------- Check the map scale
+    if np.amin(image) == np.amax(image):
+        logscale = False
+        print('WARNING: the image is empty. You may have set the map coordinates far away from the cluster center.')
     
     #---------- Plot the map
     fig = plt.figure()
@@ -153,10 +158,10 @@ def maps(image, header, filename,
         plt.imshow(image, origin='lower', cmap='magma', norm=SymLogNorm(1))
     else:
         plt.imshow(image, origin='lower', cmap='magma')
-
+        
     if coord != None and theta_500 != None:
         circle = matplotlib.patches.Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
-                                            2*theta_500.to_value('deg')/np.cos(coord.icrs.ra.rad),
+                                            2*theta_500.to_value('deg')/np.cos(coord.icrs.dec.rad),
                                             2*theta_500.to_value('deg'),
                                             linewidth=2, fill=False, zorder=2,
                                             edgecolor='white', linestyle='-.',
@@ -170,7 +175,7 @@ def maps(image, header, filename,
 
     if coord != None and theta_trunc != None:
         circle = matplotlib.patches.Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
-                                            2*theta_trunc.to_value('deg')/np.cos(coord.icrs.ra.rad),
+                                            2*theta_trunc.to_value('deg')/np.cos(coord.icrs.dec.rad),
                                             2*theta_trunc.to_value('deg'),
                                             linewidth=2, fill=False, zorder=2,
                                             edgecolor='white', linestyle='--',
