@@ -248,11 +248,11 @@ class Cluster(object):
         
         # Electronic density
         self._density_gas_model = {"name"   : "SVM",
-                                   "n_0"    : 1e-2*u.Unit('cm-3'),
-                                   "r_c"    : 100.0*u.kpc,
+                                   "n_0"    : 3e-3*u.Unit('cm-3'),
+                                   "r_c"    : 500.0*u.kpc,
                                    "beta"   : 0.75,
-                                   "r_s"    : 500.0*u.kpc,
-                                   "alpha"  : 0.0,
+                                   "r_s"    : 800.0*u.kpc,
+                                   "alpha"  : 0.6,
                                    "gamma"  : 3.0,
                                    "epsilon": 0.0}
 
