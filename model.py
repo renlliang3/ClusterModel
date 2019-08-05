@@ -229,8 +229,9 @@ class Cluster(object):
         self._R_truncation     = 3*self._R500
         self._theta_truncation = ((self._R_truncation / self._D_ang).to('') * u.rad).to('deg')
         
-        # Mean molecular weights
+        # He fraction and metal abundances (in unit of Z_sun)
         self._helium_mass_fraction = 0.245
+        self._abundance = 0.3
 
         # HSE bias
         self._hse_bias = 0.2
@@ -350,6 +351,11 @@ class Cluster(object):
     def helium_mass_fraction(self):
         if not self._silent: print("Getting helium mass fraction value")
         return self._helium_mass_fraction
+
+    @property
+    def abundance(self):
+        if not self._silent: print("Getting the abundance value")
+        return self._abundance
 
     @property
     def hse_bias(self):
@@ -637,7 +643,21 @@ class Cluster(object):
         
         # Information
         if not self._silent: print("Setting helium mass fraction value")
-
+        
+    @abundance.setter
+    def abundance(self, value):
+        # Check value
+        if type(value) == float:
+            if value >= 0.0:
+                self._abundance = value
+            else:
+                raise ValueError("The abundance should be >= 0")
+        else:
+            raise TypeError("The abundance should be a float")
+        
+        # Information
+        if not self._silent: print("Setting abundance value")
+        
     @hse_bias.setter
     def hse_bias(self, value):
         # Check value

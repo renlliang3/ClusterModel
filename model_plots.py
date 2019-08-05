@@ -1,5 +1,5 @@
 """
-This script contains plotting tools associated with the clusterclass.
+This script contains plotting tools associated with the cluster class.
 
 """
 
