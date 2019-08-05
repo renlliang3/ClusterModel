@@ -55,6 +55,7 @@ class Cluster(object):
     - Extract astrometric properties of headers when using them instead of just copying it
     - Include cluster metallicity instead of local abundances for nuclear enhancement
     - Compute the X-ray surface brightness
+    - Compute the X-ray counts for ROSAT
     - Compute the secondary electron/positrons
     - Include the magnetic field profile
     - Compute the radio synchrotron emission from secondaries
@@ -82,6 +83,7 @@ class Cluster(object):
     - R_truncation (quantity): the radius at which the cluster stops (similar as virial radius)
     - theta_truncation (quantity): the angle corresponding to R_truncation.
     - helium_mass_fraction (float): the helium mass fraction of the gas (==Yp~0.25 in BBN)
+    - abundance (float): the abundance in unit of Zsun
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
     - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
     profile. It contains the name of the model and the associated model parameters. 
@@ -133,6 +135,9 @@ class Cluster(object):
     mass profile and a mean hydrostatic mass bias.
     - get_gas_mass_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the gas mass profile
     - get_fgas_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the gas fraction profile
+    - get_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the thermal
+    energy profile
+
     - get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the spherically 
     integrated compton parameter profile
     - get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the cylindrincally 
@@ -140,6 +145,7 @@ class Cluster(object):
     - get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
     compute the Compton parameter profile
     - get_ymap(self, FWHM=None, NR500max=5.0, Npt_los=100): compute a Compton parameter map.
+
     - get_normed_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the radial 
     part of the cosmic ray protons distribution, f(r), in dN/dEdV = A f(r) f(E)
     - get_normed_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV): get the spectral part
@@ -2474,7 +2480,7 @@ class Cluster(object):
         V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
                                                           self._X_cr['Rcut'].to_value('kpc'))*u.kpc**3
 
-        #---------- Compute the integral sperical volume
+        #---------- Compute the integral spherical volume
         if type_integral == 'spherical':
             r3d2 = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
             radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
@@ -2515,7 +2521,7 @@ class Cluster(object):
 
     
     #==================================================
-    # Compute gamma ray spectrum
+    # Compute gamma ray profile
     #==================================================
     
     def get_gamma_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=10.0*u.MeV, Emax=1.0*u.PeV, Energy_density=False,
@@ -2602,7 +2608,55 @@ class Cluster(object):
             
         return Rproj, dN_dSdtdO
 
+
+    #==================================================
+    # Compute gamma ray flux
+    #==================================================
     
+    def get_gamma_flux(self, Rmax=None, type_integral='spherical', NR500max=5.0, Npt_los=100,
+                       Emin=10.0*u.MeV, Emax=1.0*u.PeV, Energy_density=False):
+        
+        """
+        Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the gamma ray emmission enclosed within an circular area (i.e.
+        cylindrical), and in a givn energy band.
+        
+        Parameters
+        ----------
+        - Rmax (quantity): the radius within with the spectrum is computed 
+        (default is R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+        - Npt_los (int): the number of points for line of sight integration.
+        This is used only for cylindrical case
+        - Emin (quantity): the lower bound for gamma ray energy integration
+        - Emax (quantity): the upper bound for gamma ray energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+
+        Outputs
+        ----------
+        - flux (quantity) : the gamma ray flux either in GeV/cm2/s or ph/cm2/s, depending
+        on parameter Energy_density
+
+        """
+        
+        energy = np.logspace(np.log10(Emin.to_value('GeV')),np.log10(Emax.to_value('GeV')),1000)*u.GeV
+        energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral=type_integral, NR500max=NR500max, Npt_los=Npt_los)
+
+        if Energy_density:
+            flux = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
+                                                          energy.to_value('GeV')*dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
+                                                          Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('GeV cm-2 s-1')
+        else:
+            flux = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
+                                                          dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
+                                                          Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('cm-2 s-1')
+            
+        return flux
+
+
     #==================================================
     # Compute gamma map
     #==================================================
