@@ -2020,7 +2020,7 @@ class Cluster(object):
         
         Outputs
         ----------
-        - radius (quantity): the 3d radius in unit of kpc
+        - radius (quantity): the projected 2d radius in unit of kpc
         - y_r : the Compton parameter
 
         Note
@@ -2735,12 +2735,7 @@ class Cluster(object):
         
         return gamma_template_norm.to('sr-1')
 
-
-
-
-
-
-
+    
     #==================================================
     # Compute a Xspec table versus temperature
     #==================================================
@@ -2797,16 +2792,34 @@ class Cluster(object):
                                        file_out=self._output_dir+'/xspec_analysis_output.txt',
                                        model='APEC', cleanup=True,
                                        logspace=True)
+        
+    
+    #==================================================
+    # Compute a Xspec table versus temperature
+    #==================================================
+    
+    def get_sx_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+        """
+        Compute a surface brightness Xray profile. An xspec table file is needed as 
+        output_dir+'/XSPEC_table.txt'.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+        
+        Outputs
+        ----------
+        - Rproj (quantity): the 3d radius in unit of kpc
+
+        Sx
+
+        """
 
 
 
-
-
-
-
-
-
-
+        retu
 
 
 
