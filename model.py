@@ -2958,8 +2958,111 @@ class Cluster(object):
         return radius, flux_r.to('erg s-1 cm-2')
 
 
+    #==================================================
+    # Compute Xray cylindrical flux
+    #==================================================
+
+    def get_fxcyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+        """
+        Get the cylindrically integrated Xray flux profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+        
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - Fcyl_r (quantity): the integrated Xray flux parameter erg/s/cm2
+
+        """
+        
+        # In case the input is not an array
+        if type(radius.to_value()) == float:
+            radius = np.array([radius.to_value()]) * radius.unit
+
+        #---------- Define radius associated to the Sx profile
+        sx_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        
+        #---------- Get the Sx profile
+        r2d, sx_r = self.get_sx_profile(sx_radius, NR500max=NR500max, Npt_los=Npt_los)
+
+        #---------- Integrate the Compton parameter in 2d
+        Fcyl_r = np.zeros(len(radius))
+        for i in range(len(radius)):
+            Fcyl_r[i] = cluster_profile.get_surface_any_model(r2d.to_value('kpc'), sx_r.to_value('erg s-1 cm-2 sr-1'),
+                                                              radius.to_value('kpc')[i], Npt=1000)
+        flux_r = Fcyl_r / self._D_ang.to_value('kpc')**2 * u.Unit('erg s-1 cm-2')
+        
+        return radius, flux_r.to('erg s-1 cm-2')
 
 
+    #==================================================
+    # Compute Sx map 
+    #==================================================
+    
+    def get_sxmap(self, FWHM=None, NR500max=5.0, Npt_los=100):
+        """
+        Compute a Surface brightness X-ray mmap.
+        
+        Parameters
+        ----------
+        - FWHM (quantity) : the beam smoothing FWHM (homogeneous to deg)
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+
+        Outputs
+        ----------
+        - sxmap (quantity) : the Sx map
+
+        """
+        
+        # Get the header
+        header = self.get_map_header()
+        w = WCS(header)
+        if w.wcs.has_cd():
+            if w.wcs.cd[1,0] != 0 or w.wcs.cd[0,1] != 0:
+                print('!!! WARNING: R.A and Dec. is rotated wrt x and y. The extracted resolution was not checked in such situation.')
+            map_reso_x = np.sqrt(w.wcs.cd[0,0]**2 + w.wcs.cd[1,0]**2)
+            map_reso_y = np.sqrt(w.wcs.cd[1,1]**2 + w.wcs.cd[0,1]**2)
+        else:
+            map_reso_x = np.abs(w.wcs.cdelt[0])
+            map_reso_y = np.abs(w.wcs.cdelt[1])
+        
+        # Get a R.A-Dec. map
+        ra_map, dec_map = map_tools.get_radec_map(header)
+
+        # Get a cluster distance map
+        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
+
+        # Define the radius used fo computing the Sx profile
+        theta_max = np.amax(dist_map) # maximum angle from the cluster
+        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
+        if theta_min == 0:
+            theta_min = 1e-4 # Zero will cause bug, put <1arcsec in this case
+        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
+        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
+        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
+
+        # Compute the Compton parameter projected profile
+        r_proj, sx_profile = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los) # kpc, erg/s/cm2/sr
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                                 # degrees
+        
+        # Interpolate the profile onto the map
+        sxmap = map_tools.profile2map(sx_profile.to_value('erg s-1 cm-2 sr-1'), theta_proj, dist_map)
+        
+        # Avoid numerical residual ringing from interpolation
+        sxmap[dist_map > self._theta_truncation.to_value('deg')] = 0
+        
+        # Smooth the ymap if needed
+        if FWHM != None:
+            FWHM2sigma = 1.0/(2.0*np.sqrt(2*np.log(2)))
+            sxmap = ndimage.gaussian_filter(sxmap, sigma=(FWHM2sigma*FWHM.to_value('deg')/map_reso_x,
+                                                          FWHM2sigma*FWHM.to_value('deg')/map_reso_y), order=0)
+
+        return sxmap*u.Unit('erg s-1 cm-2 sr-1')
 
     
     #==================================================
