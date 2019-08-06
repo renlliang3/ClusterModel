@@ -150,12 +150,17 @@ def maps(image, header, filename,
     if np.amin(image) == np.amax(image):
         logscale = False
         print('WARNING: the image is empty. You may have set the map coordinates far away from the cluster center.')
-    
+
+
+    #---------- Get vmin/max
+    vmax = np.amax(image)
+    vmin = vmax/1e4
+        
     #---------- Plot the map
     fig = plt.figure()
     ax = plt.subplot(projection=wcs_map)
     if logscale:
-        plt.imshow(image, origin='lower', cmap='magma', norm=SymLogNorm(1))
+        plt.imshow(image, origin='lower', cmap='magma', norm=SymLogNorm(vmin, vmin=vmin, vmax=vmax))
     else:
         plt.imshow(image, origin='lower', cmap='magma')
         
@@ -316,6 +321,21 @@ def main(cluster, list_prod=['all'],
         rad, prof = cluster.get_gamma_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False, NR500max=NR500max, Npt_los=Npt_los)
         profile(radius, angle, prof.to('cm-2 s-1 sr-1'), cluster._output_dir+'/PLOT_PROF_SBgamma.pdf',
                 label='$\\gamma$-ray surface brightness (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=cluster._R500)
+
+        # Spherically integrated Xray flux
+        rad, prof = cluster.get_fxsph_profile(radius)
+        profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxsph.pdf',
+                label='$F_X$ spherical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
+
+        # Cylindrically integrated Xray flux
+        rad, prof = cluster.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+        profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxcyl.pdf',
+                label='$F_X$ cylindrical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
+
+        # Sx profile
+        rad, prof = cluster.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+        profile(radius, angle, prof.to('erg s-1 cm-2 sr-1'), cluster._output_dir+'/PLOT_PROF_Sx.pdf',
+                label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=cluster._R500)
         
     #---------- Spectra
     if 'all' in list_prod or 'spectra' in list_prod:
@@ -338,12 +358,18 @@ def main(cluster, list_prod=['all'],
         header = cluster.get_map_header()
 
         # ymap
-        image = cluster.get_ymap().to_value('adu')
+        image = cluster.get_ymap(NR500max=NR500max, Npt_los=Npt_los).to_value('adu')
         maps(image*1e6, header, cluster._output_dir+'/PLOT_MAP_ycompon.pdf',
              label='Compton parameter $\\times 10^{6}$', coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
         
-        # ymap    
-        image = cluster.get_gamma_template_map().to_value('sr-1')
+        # gamma    
+        image = cluster.get_gamma_template_map(NR500max=NR500max, Npt_los=Npt_los).to_value('sr-1')
         maps(image, header, cluster._output_dir+'/PLOT_MAP_gamma_template.pdf', label='$\\gamma$-ray template (sr$^{-1}$)',
              coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
+
+        # Sx map    
+        image = cluster.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
+        maps(image, header, cluster._output_dir+'/PLOT_MAP_Sx.pdf', label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
+             coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
+
 

@@ -54,10 +54,11 @@ class Cluster(object):
     
     To do list
     ----------  
-    - Extract astrometric properties of headers when using them instead of just copying it
-    - Include cluster metallicity instead of local abundances for nuclear enhancement
-    - Compute the X-ray surface brightness
     - Compute the X-ray counts for ROSAT
+    - Split into subclasses : physics, observables, tools
+    - Extract astrometric properties of headers when using them instead of just copying it
+    - Include EBL in gamma spectrum
+    - Include cluster metallicity instead of local abundances for nuclear enhancement
     - Compute the secondary electron/positrons
     - Include the magnetic field profile
     - Compute the radio synchrotron emission from secondaries
@@ -3048,7 +3049,7 @@ class Cluster(object):
 
         # Compute the Compton parameter projected profile
         r_proj, sx_profile = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los) # kpc, erg/s/cm2/sr
-        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                                 # degrees
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                           # degrees
         
         # Interpolate the profile onto the map
         sxmap = map_tools.profile2map(sx_profile.to_value('erg s-1 cm-2 sr-1'), theta_proj, dist_map)
@@ -3262,6 +3263,27 @@ class Cluster(object):
                 self._save_txt_file(self._output_dir+'/PROFILE_gamma_ray_surface_brightness.txt',
                                     radius.to_value('kpc'), prof.to_value('cm-2 s-1 sr-1'), 'radius (kpc)', 'gamma SB (cm-2 s-1 sr-1)')
 
+        #---------- Spherically integrated X flux
+        if 'all' in prod_list or 'fx_sph' in prod_list:
+            rad, prof = self.get_fxsph_profile(radius)
+            tab['fx_sph'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Spherically integrated Xray fux')
+            self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_spherical.txt',
+                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx sph (erg s-1 cm-2)')
+
+        #---------- Cylindrically integrated X flux
+        if 'all' in prod_list or 'fx_cyl' in prod_list:
+            rad, prof = self.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            tab['fx_cyl'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Cylindrically integrated Xray flux')
+            self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_cylindrical.txt',
+                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx cyl (erg s-1 cm-2)')
+
+        #---------- Sx
+        if 'all' in prod_list or 'sx' in prod_list:
+            rad, prof = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            tab['sx'] = Column(prof.to_value('erg s-1 cm-2 sr-1'), unit='erg s-1 cm-2 sr-1', description='Xray surface brightness')
+            self._save_txt_file(self._output_dir+'/PROFILE_xray_surface_brightness.txt',
+                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2 sr-1'), 'radius (kpc)', 'Sx (erg s-1 cm-2 sr-1)')
+
         # Save the data frame in a single file as well
         tab.meta['comments'] = ['Proton spectra are integrated within '+str(Epmin)+' and '+str(Epmax)+'.',
                                 'Gamma ray spectra are integrated within '+str(Egmin)+' and '+str(Egmax)+'.',
@@ -3363,19 +3385,28 @@ class Cluster(object):
 
         #---------- y map
         if 'all' in prod_list or 'y_map' in prod_list:
-            image = self.get_ymap().to_value('adu')
+            image = self.get_ymap(NR500max=NR500max, Npt_los=Npt_los).to_value('adu')
 
             hdu = fits.PrimaryHDU(header=header)
             hdu.data = image
             hdu.writeto(self._output_dir+'/MAP_y_sz.fits', overwrite=True)
-            
+
         #---------- gamma map
         if 'all' in prod_list or 'gamma_map' in prod_list: 
-            image = self.get_gamma_template_map().to_value('sr-1')
+            image = self.get_gamma_template_map(NR500max=NR500max, Npt_los=Npt_los).to_value('sr-1')
 
             hdu = fits.PrimaryHDU(header=header)
             hdu.data = image
             hdu.writeto(self._output_dir+'/MAP_gamma_template.fits', overwrite=True)
+
+       #---------- Sx map
+        if 'all' in prod_list or 'sx_map' in prod_list:
+            image = self.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
+
+            hdu = fits.PrimaryHDU(header=header)
+            hdu.data = image
+            hdu.writeto(self._output_dir+'/MAP_Sx.fits', overwrite=True)
+
             
     #==================================================
     # Plots
