@@ -2743,7 +2743,7 @@ class Cluster(object):
     
     def make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,
                          Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
-                         nH=0.0/u.cm**2, file_HI=None, Visu_nH=False,
+                         nH=0.0/u.cm**2, file_HI=None, visu_nH=False,
                          Kcor=False):
         """
         Generate an xspec table as a function of temperature, for the cluster.
@@ -2767,16 +2767,24 @@ class Cluster(object):
         XSPEC table created in the output directory
 
         """
-
+        
         # Create the output directory if needed
         if not os.path.exists(self._output_dir): os.mkdir(self._output_dir)
         
         # In case we want nH from real data at cluster location
         if file_HI != None :
+            # Make sure the FoV and resolution are ok
+            if self._map_fov == None or self._map_reso == None:
+                fov = 1.0
+                reso = 0.1
+            else:
+                fov = self._map_fov.to_value('deg')
+                reso = self._map_reso.to_value('deg')
+                
             nH2use, nH2use_err = cluster_xspec.get_nH(file_HI,
                                                       self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'),
-                                                      fov=self._map_fov.to_value('deg'), reso=self._map_reso.to_value('deg'),
-                                                      save_file=None, visu=Visu_nH)
+                                                      fov=fov, reso=reso,
+                                                      save_file=None, visu=visu_nH)
             if nH2use/nH2use_err < 5 :
                 print('!!! WARNING, nH is not well constain in the field (S/N < 5) and nH='+str(nH2use)+' 10^22 cm-2.')
 
@@ -2900,8 +2908,54 @@ class Cluster(object):
         
         return Rproj.to('kpc'), Sx.to('erg s-1 cm-2 sr-1')
 
+    
+    #==================================================
+    # Compute Xray spherical flux
+    #==================================================
 
+    def get_fxsph_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+        """
+        Get the spherically integrated Xray flux profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
 
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - Fsph_r (quantity): the integrated Xray flux parameter erg/s/cm2
+
+        """
+
+        # In case the input is not an array
+        if type(radius.to_value()) == float:
+            radius = np.array([radius.to_value()]) * radius.unit
+
+        #---------- Define radius associated to the density/temperature
+        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        n_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        
+        #---------- Get the density profile and temperature
+        rad, n_e  = self.get_density_gas_profile(radius=n_radius)
+        rad, T_g  = self.get_temperature_gas_profile(radius=n_radius)
+
+        #---------- Interpolate the differential surface brightness
+        dC_xspec, dS_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
+        
+        #---------- Integrate in 3d
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
+        integrand = constant.to_value('kpc-2')*dS_xspec.to_value('erg cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
+
+        EI_r = np.zeros(len(radius))
+        for i in range(len(radius)):
+            EI_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), integrand,
+                                                           radius.to_value('kpc')[i], Npt=1000)
+
+        flux_r = EI_r*u.Unit('kpc-2 erg cm3 s-1 cm-6 kpc3')
+
+        return radius, flux_r.to('erg s-1 cm-2')
 
 
 
