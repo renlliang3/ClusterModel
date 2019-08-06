@@ -7,6 +7,8 @@
 # Python and temporary files
 *~
 *.pyc
+\#
+.#
 
 # Possible hidden files 
 .idea
