@@ -13,6 +13,7 @@ component of the clusters.
 import numpy as np
 from scipy.misc import derivative
 from scipy.optimize import brentq
+import scipy.interpolate as interpolate
 import scipy.ndimage as ndimage
 import pprint
 import pickle
@@ -2020,7 +2021,7 @@ class Cluster(object):
         
         Outputs
         ----------
-        - radius (quantity): the 3d radius in unit of kpc
+        - radius (quantity): the projected 2d radius in unit of kpc
         - y_r : the Compton parameter
 
         Note
@@ -2735,19 +2736,14 @@ class Cluster(object):
         
         return gamma_template_norm.to('sr-1')
 
-
-
-
-
-
-
+    
     #==================================================
     # Compute a Xspec table versus temperature
     #==================================================
     
     def make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,
                          Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
-                         nH=0.0/u.cm**2, file_HI=None,
+                         nH=0.0/u.cm**2, file_HI=None, Visu_nH=False,
                          Kcor=False):
         """
         Generate an xspec table as a function of temperature, for the cluster.
@@ -2763,6 +2759,8 @@ class Cluster(object):
         - nbin (int): number of temperature point in the table (in unit of cm^-2, not 10^22 cm^-2)
         - nH (quantity): H I column density at the cluster
         - file_HI (str): full path to the map file
+        - visu_nH (bool): show the nH maps and histogram when extracted from data
+        - Kcor (bool): shift the energy by 1+z to go to the cluster frame
 
         Outputs
         ----------
@@ -2778,7 +2776,7 @@ class Cluster(object):
             nH2use, nH2use_err = cluster_xspec.get_nH(file_HI,
                                                       self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'),
                                                       fov=self._map_fov.to_value('deg'), reso=self._map_reso.to_value('deg'),
-                                                      save_file=None, visu=False)
+                                                      save_file=None, visu=Visu_nH)
             if nH2use/nH2use_err < 5 :
                 print('!!! WARNING, nH is not well constain in the field (S/N < 5) and nH='+str(nH2use)+' 10^22 cm-2.')
 
@@ -2797,23 +2795,118 @@ class Cluster(object):
                                        file_out=self._output_dir+'/xspec_analysis_output.txt',
                                        model='APEC', cleanup=True,
                                        logspace=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         
+
+    #==================================================
+    # Read and interpolate xspec tables
+    #==================================================
     
+    def itpl_xspec_table(self, xspecfile, Tinput):
+        """
+        Read an Xspec table and interpolate values at a given temperature
+
+        Parameters
+        ----------
+        - xspecfile (str): full path to Xspec file to read
+
+        Outputs
+        ----------
+        - dC (quantity): the interpolated differential counts
+        - dS (quantity): the interpolated differential surface brightness counts
+
+        """
+        file_start = 3
+        
+        # Read the temperature
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[0]
+            Txspec = np.array(col[file_start:]).astype(np.float)
+
+        # Read Xspec counts
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[1]
+            Cxspec = np.array(col[file_start:]).astype(np.float)
+
+        # Read Xspec surface brightness
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[2]
+            Sxspec = np.array(col[file_start:]).astype(np.float)
+
+        # Define interpolation and set unit
+        Citpl = interpolate.interp1d(Txspec, Cxspec, kind='cubic', fill_value='extrapolate')
+        Sitpl = interpolate.interp1d(Txspec, Sxspec, kind='cubic', fill_value='extrapolate')
+
+        dCxspec = Citpl(Tinput.to_value('keV')) * 1/u.cm**2/u.s/u.cm**-5
+        dSxspec = Sitpl(Tinput.to_value('keV')) * u.erg/u.cm**2/u.s/u.cm**-5
+
+        # Take care of undefined temperature (i.e. no gas)
+        dCxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
+        dSxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
+
+        return dCxspec, dSxspec
+        
+        
+    #==================================================
+    # Compute a Xspec table versus temperature
+    #==================================================
+    
+    def get_sx_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+        """
+        Compute a surface brightness Xray profile. An xspec table file is needed as 
+        output_dir+'/XSPEC_table.txt'.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+        
+        Outputs
+        ----------
+        - Rproj (quantity): the projected 2d radius in unit of kpc
+        - Sx (quantity): the Xray surface brightness projectes profile
+
+        """
+
+        # In case the input is not an array
+        if type(radius.to_value()) == float:
+            radius = np.array([radius.to_value()]) * radius.unit
+
+        # Get the gas density profile
+        n_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
+                                                            Rmin=1.0, Rmax=NR500max*self._R500.to_value('kpc'),
+                                                            Nptmin=1000)*u.kpc
+
+        # Get the density and temperature profile
+        rad3d, n_e  = self.get_density_gas_profile(radius=n_radius)
+        rad3d, T_g  = self.get_temperature_gas_profile(radius=n_radius)
+
+        # Interpolate Xspec table
+        dC_xspec, dS_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
+        
+        # Projection to get Emmission Measure
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
+        integrand = constant.to_value('kpc-2')*dS_xspec.to_value('erg cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
+
+        Rmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
+        Rpmax = np.amax(radius.to_value('kpc'))              # Max radius to which we get the profile
+        Rproj, Sx = cluster_profile.proj_any_model(rad3d.to_value('kpc'), integrand,
+                                                   Npt=Npt_los, Rmax=Rmax, Rpmax=Rpmax, Rp_input=radius.to_value('kpc'))
+        Rproj *= u.kpc
+        Sx    *= u.kpc * u.kpc**-2 * u.erg*u.cm**3/u.s * u.cm**-6 # write unit explicitlly
+        Sx[Rproj > self._R_truncation] = 0.0
+        Sx = (Sx*self._D_ang**2).to('erg s-1 cm-2')/u.sr
+        
+        return Rproj.to('kpc'), sx.to('erg s-1 cm-2 sr-1')
+
+
+
+
+
+
+
+
     
     #==================================================
     # Saving txt file utility function
