@@ -2898,7 +2898,7 @@ class Cluster(object):
         Sx[Rproj > self._R_truncation] = 0.0
         Sx = (Sx*self._D_ang**2).to('erg s-1 cm-2')/u.sr
         
-        return Rproj.to('kpc'), sx.to('erg s-1 cm-2 sr-1')
+        return Rproj.to('kpc'), Sx.to('erg s-1 cm-2 sr-1')
 
 
 
