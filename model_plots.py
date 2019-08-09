@@ -14,6 +14,7 @@ import astropy.units as u
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
+import os
 
 cta_energy_range   = [0.02, 100.0]*u.TeV
 fermi_energy_range = [0.1, 300.0]*u.GeV
@@ -322,21 +323,24 @@ def main(cluster, list_prod=['all'],
         profile(radius, angle, prof.to('cm-2 s-1 sr-1'), cluster._output_dir+'/PLOT_PROF_SBgamma.pdf',
                 label='$\\gamma$-ray surface brightness (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=cluster._R500)
 
-        # Spherically integrated Xray flux
-        rad, prof = cluster.get_fxsph_profile(radius)
-        profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxsph.pdf',
-                label='$F_X$ spherical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
-
-        # Cylindrically integrated Xray flux
-        rad, prof = cluster.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-        profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxcyl.pdf',
-                label='$F_X$ cylindrical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
-
-        # Sx profile
-        rad, prof = cluster.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-        profile(radius, angle, prof.to('erg s-1 cm-2 sr-1'), cluster._output_dir+'/PLOT_PROF_Sx.pdf',
-                label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=cluster._R500)
-        
+        if os.path.exists(cluster._output_dir+'/XSPEC_table.txt'):
+            # Spherically integrated Xray flux
+            rad, prof = cluster.get_fxsph_profile(radius)
+            profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxsph.pdf',
+                    label='$F_X$ spherical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
+            
+            # Cylindrically integrated Xray flux
+            rad, prof = cluster.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxcyl.pdf',
+                    label='$F_X$ cylindrical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
+            
+            # Sx profile
+            rad, prof = cluster.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            profile(radius, angle, prof.to('erg s-1 cm-2 sr-1'), cluster._output_dir+'/PLOT_PROF_Sx.pdf',
+                    label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=cluster._R500)
+        else:
+            print('!!! WARNING: XSPEC_table.txt not generated, skip Xray flux and Sx')
+                
     #---------- Spectra
     if 'all' in list_prod or 'spectra' in list_prod:
         # CR protons
@@ -367,9 +371,12 @@ def main(cluster, list_prod=['all'],
         maps(image, header, cluster._output_dir+'/PLOT_MAP_gamma_template.pdf', label='$\\gamma$-ray template (sr$^{-1}$)',
              coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
 
-        # Sx map    
-        image = cluster.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
-        maps(image, header, cluster._output_dir+'/PLOT_MAP_Sx.pdf', label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
-             coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
-
+        # Sx map
+        if os.path.exists(cluster._output_dir+'/XSPEC_table.txt'):
+            image = cluster.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
+            maps(image, header, cluster._output_dir+'/PLOT_MAP_Sx.pdf', label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
+                 coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
+        else:
+            print('!!! WARNING: XSPEC_table.txt not generated, skip sx_map')
+                
 

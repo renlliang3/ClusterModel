@@ -54,9 +54,7 @@ class Cluster(object):
     
     To do list
     ----------  
-    - Compute the X-ray counts for ROSAT
     - Split into subclasses : physics, observables, tools
-    - Extract astrometric properties of headers when using them instead of just copying it
     - Include EBL in gamma spectrum
     - Include cluster metallicity instead of local abundances for nuclear enhancement
     - Compute the secondary electron/positrons
@@ -1168,11 +1166,15 @@ class Cluster(object):
         # Check the header by reading it with WCS
         try:
             w = WCS(value)
+            data_tpl = np.zeros((value['NAXIS2'], value['NAXIS1']))            
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(header=header, data=data_tpl)
+            header = hdu.header
         except:
-            raise TypeError("It seems that the header you provided is not really a header.")
+            raise TypeError("It seems that the header you provided is not really a header, or does not contain NAXIS1,2.")
         
         # set the value
-        self._map_header = value
+        self._map_header = header
         self._map_coord  = None
         self._map_reso   = None
         self._map_fov    = None
@@ -3381,25 +3383,34 @@ class Cluster(object):
 
         #---------- Spherically integrated X flux
         if 'all' in prod_list or 'fx_sph' in prod_list:
-            rad, prof = self.get_fxsph_profile(radius, output_type=Sx_type)
-            tab['fx_sph'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Spherically integrated Xray fux')
-            self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_spherical.txt',
-                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx sph (erg s-1 cm-2)')
-
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                rad, prof = self.get_fxsph_profile(radius, output_type=Sx_type)
+                tab['fx_sph'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Spherically integrated Xray fux')
+                self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_spherical.txt',
+                                    radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx sph (erg s-1 cm-2)')
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip fx_sph')
+                
         #---------- Cylindrically integrated X flux
         if 'all' in prod_list or 'fx_cyl' in prod_list:
-            rad, prof = self.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los, output_type=Sx_type)
-            tab['fx_cyl'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Cylindrically integrated Xray flux')
-            self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_cylindrical.txt',
-                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx cyl (erg s-1 cm-2)')
-
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                rad, prof = self.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los, output_type=Sx_type)
+                tab['fx_cyl'] = Column(prof.to_value('erg s-1 cm-2'), unit='erg s-1 cm-2', description='Cylindrically integrated Xray flux')
+                self._save_txt_file(self._output_dir+'/PROFILE_xray_flux_cylindrical.txt',
+                                    radius.to_value('kpc'), prof.to_value('erg s-1 cm-2'), 'radius (kpc)', 'Fx cyl (erg s-1 cm-2)')
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip fx_cyl')
+                
         #---------- Sx
         if 'all' in prod_list or 'sx' in prod_list:
-            rad, prof = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los, output_type=Sx_type)
-            tab['sx'] = Column(prof.to_value('erg s-1 cm-2 sr-1'), unit='erg s-1 cm-2 sr-1', description='Xray surface brightness')
-            self._save_txt_file(self._output_dir+'/PROFILE_xray_surface_brightness.txt',
-                                radius.to_value('kpc'), prof.to_value('erg s-1 cm-2 sr-1'), 'radius (kpc)', 'Sx (erg s-1 cm-2 sr-1)')
-
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                rad, prof = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los, output_type=Sx_type)
+                tab['sx'] = Column(prof.to_value('erg s-1 cm-2 sr-1'), unit='erg s-1 cm-2 sr-1', description='Xray surface brightness')
+                self._save_txt_file(self._output_dir+'/PROFILE_xray_surface_brightness.txt',
+                                    radius.to_value('kpc'), prof.to_value('erg s-1 cm-2 sr-1'), 'radius (kpc)', 'Sx (erg s-1 cm-2 sr-1)')
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip sx')
+                
         # Save the data frame in a single file as well
         tab.meta['comments'] = ['Proton spectra are integrated within '+str(Epmin)+' and '+str(Epmax)+'.',
                                 'Gamma ray spectra are integrated within '+str(Egmin)+' and '+str(Egmax)+'.',
@@ -3505,6 +3516,8 @@ class Cluster(object):
 
             hdu = fits.PrimaryHDU(header=header)
             hdu.data = image
+            hdu.header.add_comment('Compton parameter ymap')
+            hdu.header.add_comment('Adimensional unit')
             hdu.writeto(self._output_dir+'/MAP_y_sz.fits', overwrite=True)
 
         #---------- gamma map
@@ -3513,16 +3526,23 @@ class Cluster(object):
 
             hdu = fits.PrimaryHDU(header=header)
             hdu.data = image
+            hdu.header.add_comment('Gamma-ray template map')
+            hdu.header.add_comment('Unit = sr-1')
             hdu.writeto(self._output_dir+'/MAP_gamma_template.fits', overwrite=True)
 
        #---------- Sx map
         if 'all' in prod_list or 'sx_map' in prod_list:
-            image = self.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
-
-            hdu = fits.PrimaryHDU(header=header)
-            hdu.data = image
-            hdu.writeto(self._output_dir+'/MAP_Sx.fits', overwrite=True)
-
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                image = self.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
+                
+                hdu = fits.PrimaryHDU(header=header)
+                hdu.data = image
+                hdu.header.add_comment('Xray surface brightness map')
+                hdu.header.add_comment('Unit = erg s-1 cm-2 sr-1')
+                hdu.writeto(self._output_dir+'/MAP_Sx.fits', overwrite=True)
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip sx_map')
+                
             
     #==================================================
     # Plots
