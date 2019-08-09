@@ -49,8 +49,7 @@ class Cluster(object):
     - pressure profile ;
     - density profile ; 
     - cosmic ray spatial/energy distribution ;
-
-    from which derived properties can be computed (e.g. hydrostatic mass profile)
+    From these, derived properties can be computed (e.g. hydrostatic mass profile)
     
     To do list
     ----------  
