@@ -1,14 +1,16 @@
-import numpy as np
-from scipy.misc import derivative
-from scipy.optimize import brentq
-import scipy.interpolate as interpolate
-import scipy.ndimage as ndimage
-import os
+"""
+This file contain a subclass of the model.py module and Cluster class. It
+is dedicated to the computing of observables.
 
+"""
+
+#==================================================
+# Requested imports
+#==================================================
+
+import numpy as np
+import scipy.ndimage as ndimage
 import astropy.units as u
-from astropy.io import fits
-import astropy.cosmology
-from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy import constants as const
 
@@ -17,11 +19,7 @@ import naima
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_profile 
 from ClusterTools import cluster_spectra 
-from ClusterTools import cluster_xspec 
 from ClusterTools import map_tools
-
-from ClusterModel import model_title
-from ClusterModel import model_plots
 
 
 #==================================================
@@ -201,7 +199,7 @@ class Observables(object):
         
         Outputs
         ----------
-        - radius (quantity): the projected 2d radius in unit of kpc
+        - Rproj (quantity): the projected 2d radius in unit of kpc
         - y_r : the Compton parameter
 
         Note

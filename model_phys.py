@@ -1,27 +1,26 @@
+"""
+This file contain a subclass of the model.py module and Cluster class. It
+is dedicated to the computing of the physical properties of clusters.
+
+"""
+
+#==================================================
+# Requested imports
+#==================================================
+
 import numpy as np
-from scipy.misc import derivative
 from scipy.optimize import brentq
 import scipy.interpolate as interpolate
 import scipy.ndimage as ndimage
 import os
 
 import astropy.units as u
-from astropy.io import fits
-import astropy.cosmology
-from astropy.coordinates import SkyCoord
-from astropy.wcs import WCS
 from astropy import constants as const
-
-import naima
 
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_profile 
 from ClusterTools import cluster_spectra 
-from ClusterTools import cluster_xspec 
-from ClusterTools import map_tools
-
-from ClusterModel import model_title
-from ClusterModel import model_plots
+from ClusterTools import cluster_xspec
 
 
 #==================================================
@@ -275,7 +274,6 @@ class Physics(object):
                                     "a":pppar[3],
                                     "b":pppar[4],
                                     "c":pppar[2]}
-
 
         
     #==================================================

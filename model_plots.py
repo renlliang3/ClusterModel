@@ -8,11 +8,10 @@ This script contains plotting tools associated with the cluster class.
 #==================================================
 
 import matplotlib.pyplot as plt
-import matplotlib
+from matplotlib.patches import Ellipse
 from matplotlib.colors import SymLogNorm
 import astropy.units as u
 import numpy as np
-from astropy.io import fits
 from astropy.wcs import WCS
 import os
 
@@ -166,26 +165,26 @@ def maps(image, header, filename,
         plt.imshow(image, origin='lower', cmap='magma')
         
     if coord != None and theta_500 != None:
-        circle = matplotlib.patches.Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
-                                            2*theta_500.to_value('deg')/np.cos(coord.icrs.dec.rad),
-                                            2*theta_500.to_value('deg'),
-                                            linewidth=2, fill=False, zorder=2,
-                                            edgecolor='white', linestyle='-.',
-                                            facecolor='none', transform=ax.get_transform('fk5'))
+        circle = Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
+                         2*theta_500.to_value('deg')/np.cos(coord.icrs.dec.rad),
+                         2*theta_500.to_value('deg'),
+                         linewidth=2, fill=False, zorder=2,
+                         edgecolor='white', linestyle='-.',
+                         facecolor='none', transform=ax.get_transform('fk5'))
         ax.add_patch(circle)
         txt = plt.text(coord.icrs.ra.deg - theta_500.to_value('deg'),
                        coord.icrs.dec.deg - theta_500.to_value('deg'),
                        '$R_{500}$',
                        transform=ax.get_transform('fk5'), fontsize=10, color='white',
                        horizontalalignment='center',verticalalignment='center')
-
+        
     if coord != None and theta_trunc != None:
-        circle = matplotlib.patches.Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
-                                            2*theta_trunc.to_value('deg')/np.cos(coord.icrs.dec.rad),
-                                            2*theta_trunc.to_value('deg'),
-                                            linewidth=2, fill=False, zorder=2,
-                                            edgecolor='white', linestyle='--',
-                                            facecolor='none', transform=ax.get_transform('fk5'))
+        circle = Ellipse((coord.icrs.ra.deg, coord.icrs.dec.deg),
+                         2*theta_trunc.to_value('deg')/np.cos(coord.icrs.dec.rad),
+                         2*theta_trunc.to_value('deg'),
+                         linewidth=2, fill=False, zorder=2,
+                         edgecolor='white', linestyle='--',
+                         facecolor='none', transform=ax.get_transform('fk5'))
         ax.add_patch(circle)
         txt = plt.text(coord.icrs.ra.deg - theta_trunc.to_value('deg'),
                        coord.icrs.dec.deg - theta_trunc.to_value('deg'),
