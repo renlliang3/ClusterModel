@@ -205,178 +205,202 @@ def maps(image, header, filename,
 # Main function
 #==================================================
 
-def main(cluster, list_prod=['all'],
-         radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,6,1000)*u.GeV,
-         NR500max=5.0, Npt_los=100, Rmax=None,
-         Epmin=None, Epmax=None, Egmin=10.0*u.MeV, Egmax=1.0*u.PeV):
-    """
-    Main function of the sub-module of the cluster class dedicated to plots.
-    
-    Parameters
-    ----------
-    - cluster: am object from the cluster class
-    - list_prod (list): the list of what is required for production
-    - radius (quantity) : the physical radius
-    - energy (quantity) : the physical energy of CR protons
-    - NR500max (float): the integration will stop at NR500max x R500
-    Only used for projected profiles.
-    - Npt_los (int): the number of points for line of sight integration
-    Only used for projected profiles.
-    - Epmin (quantity): the lower bound for energy proton integration
-    - Epmax (quantity): the upper bound for energy proton integration
-    - Egmin (quantity): the lower bound for energy gamma integration
-    - Egmax (quantity): the upper bound for energy gamma integration
-    - Rmax (quantity): the radius within with the spectrum is computed 
-    (default is R500)
+class Plots(object):
+    """ Observable class
+    This class serves as a parser to the main Cluster class, to 
+    include the subclass Observable in this other file.
+
+    Attributes
+    ----------  
+    The attributes are the same as the Cluster class, see model.py
+
+    Methods
+    ----------  
+    - plot(self, list_prod=['all'],radius=np.logspace(0,4,1000)*u.kpc, 
+    energy=np.logspace(-2,6,1000)*u.GeV, NR500max=5.0, Npt_los=100, Rmax=None,
+    Epmin=None, Epmax=None, Egmin=10.0*u.MeV, Egmax=1.0*u.PeV): 
 
     """
-    
-    if Epmin == None:
-        Epmin = cluster._Epmin
-    if Epmax == None:
-        Epmax = cluster._Epmax
 
-    if Rmax == None:
-        Rmax = cluster._R500
+    #==================================================
+    # Main plot function
+    #==================================================
 
-    
-    outdir = cluster._output_dir
-
-    set_default_plot_param()
-
-    #---------- Profiles
-    if 'all' in list_prod or 'profile' in list_prod:
-        angle = (radius.to_value('kpc')/cluster._D_ang.to_value('kpc')*180.0/np.pi)*u.deg
-
-        # Pressure
-        rad, prof = cluster.get_pressure_gas_profile(radius)
-        profile(radius, angle, prof.to('keV cm-3'), cluster._output_dir+'/PLOT_PROF_gas_pressure.pdf',
-                label='Electron pressure (keV cm$^{-3}$)', R500=cluster._R500)
-
-        # Density
-        rad, prof = cluster.get_density_gas_profile(radius)
-        profile(radius, angle, prof.to('cm-3'), cluster._output_dir+'/PLOT_PROF_gas_density.pdf',
-                label='Electron density (cm$^{-3}$)', R500=cluster._R500)
-
-        # temperature
-        rad, prof = cluster.get_temperature_gas_profile(radius)
-        profile(radius, angle, prof.to('keV'), cluster._output_dir+'/PLOT_PROF_gas_temperature.pdf',
-                label='Temperature (keV)', R500=cluster._R500)
-
-        # Entropy
-        rad, prof = cluster.get_entropy_gas_profile(radius)
-        profile(radius, angle, prof.to('keV cm2'), cluster._output_dir+'/PLOT_PROF_gas_entropy.pdf',
-                label='Entropy (keV cm$^2$)', R500=cluster._R500)
-
-        # Masse HSE
-        rad, prof = cluster.get_hse_mass_profile(radius)
-        profile(radius, angle, prof.to('Msun'), cluster._output_dir+'/PLOT_PROF_hse_mass.pdf',
-                label='HSE mass (M$_{\\odot}$)', R500=cluster._R500)
-
-        # Overdensity
-        rad, prof = cluster.get_overdensity_contrast_profile(radius)
-        profile(radius, angle, prof.to('adu'), cluster._output_dir+'/PLOT_PROF_overdensity.pdf',
-                label='Overdensity $\\rho / \\rho_{c}$', R500=cluster._R500)
-
-        # Gas mass
-        rad, prof = cluster.get_gas_mass_profile(radius)
-        profile(radius, angle, prof.to('Msun'), cluster._output_dir+'/PLOT_PROF_gas_mass.pdf',
-                label='Gas mass (M$_{\\odot}$)', R500=cluster._R500)
-
-        # fgas profile
-        rad, prof = cluster.get_fgas_profile(radius)
-        profile(radius, angle, prof.to('adu'), cluster._output_dir+'/PLOT_PROF_fgas.pdf',
-                label='Gas fraction', R500=cluster._R500)
-
-        # Thermal energy
-        rad, prof = cluster.get_thermal_energy_profile(radius)
-        profile(radius, angle, prof.to('erg'), cluster._output_dir+'/PLOT_PROF_thermal_energy.pdf',
-                label='Thermal energy (erg)', R500=cluster._R500)
-
-        # Spherically integrated Compton
-        rad, prof = cluster.get_ysph_profile(radius)
-        profile(radius, angle, prof.to('kpc2'), cluster._output_dir+'/PLOT_PROF_Ysph.pdf',
-                label='Y spherical (kpc$^2$)', R500=cluster._R500)
-
-        # Cylindrically integrated Compton
-        rad, prof = cluster.get_ycyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-        profile(radius, angle, prof.to('kpc2'), cluster._output_dir+'/PLOT_PROF_Ycyl.pdf',
-                label='Y cylindrical (kpc$^2$)', R500=cluster._R500)
-
-        # Compton parameter
-        rad, prof = cluster.get_y_compton_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-        profile(radius, angle, prof.to('adu'), cluster._output_dir+'/PLOT_PROF_ycompton.pdf',
-                label='y Compton', R500=cluster._R500)
-
-        # Cosmic ray proton
-        rad, prof = cluster.get_density_crp_profile(radius, Emin=Epmin, Emax=Epmax, Energy_density=False)
-        profile(radius, angle, prof.to('cm-3'), cluster._output_dir+'/PLOT_PROF_crp_density.pdf',
-                label='CRp density (cm$^{-3}$)', R500=cluster._R500)
-            
-        # Cosmic ray to thermal energy
-        rad, prof = cluster.get_crp_to_thermal_energy_profile(radius, Emin=Epmin, Emax=Epmax)
-        profile(radius, angle, prof.to('adu'), cluster._output_dir+'/PLOT_PROF_crp_fraction.pdf',
-                label='CRp to thermal energy $X_{CR}$', R500=cluster._R500)
-
-        # Gamma ray profile
-        rad, prof = cluster.get_gamma_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False, NR500max=NR500max, Npt_los=Npt_los)
-        profile(radius, angle, prof.to('cm-2 s-1 sr-1'), cluster._output_dir+'/PLOT_PROF_SBgamma.pdf',
-                label='$\\gamma$-ray surface brightness (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=cluster._R500)
-
-        if os.path.exists(cluster._output_dir+'/XSPEC_table.txt'):
-            # Spherically integrated Xray flux
-            rad, prof = cluster.get_fxsph_profile(radius)
-            profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxsph.pdf',
-                    label='$F_X$ spherical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
-            
-            # Cylindrically integrated Xray flux
-            rad, prof = cluster.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-            profile(radius, angle, prof.to('erg s-1 cm-2'), cluster._output_dir+'/PLOT_PROF_Fxcyl.pdf',
-                    label='$F_X$ cylindrical (erg s$^{-1}$ cm$^{-2}$)', R500=cluster._R500)
-            
-            # Sx profile
-            rad, prof = cluster.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
-            profile(radius, angle, prof.to('erg s-1 cm-2 sr-1'), cluster._output_dir+'/PLOT_PROF_Sx.pdf',
-                    label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=cluster._R500)
-        else:
-            print('!!! WARNING: XSPEC_table.txt not generated, skip Xray flux and Sx')
-                
-    #---------- Spectra
-    if 'all' in list_prod or 'spectra' in list_prod:
-        # CR protons
-        eng, spec = cluster.get_crp_spectrum(energy, Rmax=Rmax)
-        spectra(energy, spec.to('GeV-1'), cluster._output_dir+'/PLOT_SPEC_CRproton.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
-
-        # Spherically integrated gamma ray
-        eng, spec = cluster.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical', NR500max=NR500max, Npt_los=Npt_los)
-        spectra(energy, (energy**2*spec).to('GeV cm-2 s-1'), cluster._output_dir+'/PLOT_SPEC_Fgamma_sph.pdf',
-                label='Spherical $F_{\\gamma}$ (GeV cm$^{-2}$ s$^{-1}$)')
-
-        # Cylindrically integrated gamma ray
-        eng, spec = cluster.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='cylindrical', NR500max=NR500max, Npt_los=Npt_los)
-        spectra(energy, (energy**2*spec).to('GeV cm-2 s-1'), cluster._output_dir+'/PLOT_SPEC_Fgamma_cyl.pdf',
-                label='Cylindrical $F_{\\gamma}$ (GeV cm$^{-2}$ s$^{-1}$)')
-
-    #---------- Map
-    if 'all' in list_prod or 'map' in list_prod:
-        header = cluster.get_map_header()
-
-        # ymap
-        image = cluster.get_ymap(NR500max=NR500max, Npt_los=Npt_los).to_value('adu')
-        maps(image*1e6, header, cluster._output_dir+'/PLOT_MAP_ycompon.pdf',
-             label='Compton parameter $\\times 10^{6}$', coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
+    def plot(self, prod_list=['all'],
+             radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,6,1000)*u.GeV,
+             NR500max=5.0, Npt_los=100, Rmax=None,
+             Epmin=None, Epmax=None, Egmin=10.0*u.MeV, Egmax=1.0*u.PeV):
         
-        # gamma    
-        image = cluster.get_gamma_template_map(NR500max=NR500max, Npt_los=Npt_los).to_value('sr-1')
-        maps(image, header, cluster._output_dir+'/PLOT_MAP_gamma_template.pdf', label='$\\gamma$-ray template (sr$^{-1}$)',
-             coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
+        """
+        Main function of the sub-module of the cluster class dedicated to plots.
+        
+        Parameters
+        ----------
+        - prod_list (list): the list of what is required for production
+        - radius (quantity) : the physical radius
+        - energy (quantity) : the physical energy of CR protons
+        - NR500max (float): the integration will stop at NR500max x R500
+        Only used for projected profiles.
+        - Npt_los (int): the number of points for line of sight integration
+        Only used for projected profiles.
+        - Epmin (quantity): the lower bound for energy proton integration
+        - Epmax (quantity): the upper bound for energy proton integration
+        - Egmin (quantity): the lower bound for energy gamma integration
+        - Egmax (quantity): the upper bound for energy gamma integration
+        - Rmax (quantity): the radius within with the spectrum is computed 
+        (default is R500)
+        
+        """
 
-        # Sx map
-        if os.path.exists(cluster._output_dir+'/XSPEC_table.txt'):
-            image = cluster.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
-            maps(image, header, cluster._output_dir+'/PLOT_MAP_Sx.pdf', label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
-                 coord=cluster._coord, theta_500=cluster._theta500, theta_trunc=cluster._theta_truncation, logscale=True)
-        else:
-            print('!!! WARNING: XSPEC_table.txt not generated, skip sx_map')
+        if not os.path.exists(self._output_dir): os.mkdir(self._output_dir)
+        
+        if Epmin == None:
+            Epmin = self._Epmin
+        if Epmax == None:
+            Epmax = self._Epmax
+
+        if Rmax == None:
+            Rmax = self._R500
+
+    
+        outdir = self._output_dir
+
+        set_default_plot_param()
+
+        #---------- Profiles
+        if 'all' in prod_list or 'profile' in prod_list:
+            angle = (radius.to_value('kpc')/self._D_ang.to_value('kpc')*180.0/np.pi)*u.deg
+
+            # Pressure
+            rad, prof = self.get_pressure_gas_profile(radius)
+            profile(radius, angle, prof.to('keV cm-3'), self._output_dir+'/PLOT_PROF_gas_pressure.pdf',
+                    label='Electron pressure (keV cm$^{-3}$)', R500=self._R500)
+
+            # Density
+            rad, prof = self.get_density_gas_profile(radius)
+            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_gas_density.pdf',
+                    label='Electron density (cm$^{-3}$)', R500=self._R500)
+            
+            # temperature
+            rad, prof = self.get_temperature_gas_profile(radius)
+            profile(radius, angle, prof.to('keV'), self._output_dir+'/PLOT_PROF_gas_temperature.pdf',
+                    label='Temperature (keV)', R500=self._R500)
+            
+            # Entropy
+            rad, prof = self.get_entropy_gas_profile(radius)
+            profile(radius, angle, prof.to('keV cm2'), self._output_dir+'/PLOT_PROF_gas_entropy.pdf',
+                    label='Entropy (keV cm$^2$)', R500=self._R500)
+            
+            # Masse HSE
+            rad, prof = self.get_hse_mass_profile(radius)
+            profile(radius, angle, prof.to('Msun'), self._output_dir+'/PLOT_PROF_hse_mass.pdf',
+                    label='HSE mass (M$_{\\odot}$)', R500=self._R500)
+            
+            # Overdensity
+            rad, prof = self.get_overdensity_contrast_profile(radius)
+            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_overdensity.pdf',
+                    label='Overdensity $\\rho / \\rho_{c}$', R500=self._R500)
+            
+            # Gas mass
+            rad, prof = self.get_gas_mass_profile(radius)
+            profile(radius, angle, prof.to('Msun'), self._output_dir+'/PLOT_PROF_gas_mass.pdf',
+                    label='Gas mass (M$_{\\odot}$)', R500=self._R500)
+            
+            # fgas profile
+            rad, prof = self.get_fgas_profile(radius)
+            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_fgas.pdf',
+                    label='Gas fraction', R500=self._R500)
+            
+            # Thermal energy
+            rad, prof = self.get_thermal_energy_profile(radius)
+            profile(radius, angle, prof.to('erg'), self._output_dir+'/PLOT_PROF_thermal_energy.pdf',
+                    label='Thermal energy (erg)', R500=self._R500)
+            
+            # Spherically integrated Compton
+            rad, prof = self.get_ysph_profile(radius)
+            profile(radius, angle, prof.to('kpc2'), self._output_dir+'/PLOT_PROF_Ysph.pdf',
+                    label='Y spherical (kpc$^2$)', R500=self._R500)
+            
+            # Cylindrically integrated Compton
+            rad, prof = self.get_ycyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            profile(radius, angle, prof.to('kpc2'), self._output_dir+'/PLOT_PROF_Ycyl.pdf',
+                    label='Y cylindrical (kpc$^2$)', R500=self._R500)
+            
+            # Compton parameter
+            rad, prof = self.get_y_compton_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_ycompton.pdf',
+                    label='y Compton', R500=self._R500)
+            
+            # Cosmic ray proton
+            rad, prof = self.get_density_crp_profile(radius, Emin=Epmin, Emax=Epmax, Energy_density=False)
+            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_crp_density.pdf',
+                    label='CRp density (cm$^{-3}$)', R500=self._R500)
+            
+            # Cosmic ray to thermal energy
+            rad, prof = self.get_crp_to_thermal_energy_profile(radius, Emin=Epmin, Emax=Epmax)
+            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_crp_fraction.pdf',
+                    label='CRp to thermal energy $X_{CR}$', R500=self._R500)
+            
+            # Gamma ray profile
+            rad, prof = self.get_gamma_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False, NR500max=NR500max, Npt_los=Npt_los)
+            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), self._output_dir+'/PLOT_PROF_SBgamma.pdf',
+                    label='$\\gamma$-ray surface brightness (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=self._R500)
+            
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                # Spherically integrated Xray flux
+                rad, prof = self.get_fxsph_profile(radius)
+                profile(radius, angle, prof.to('erg s-1 cm-2'), self._output_dir+'/PLOT_PROF_Fxsph.pdf',
+                        label='$F_X$ spherical (erg s$^{-1}$ cm$^{-2}$)', R500=self._R500)
+                
+                # Cylindrically integrated Xray flux
+                rad, prof = self.get_fxcyl_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+                profile(radius, angle, prof.to('erg s-1 cm-2'), self._output_dir+'/PLOT_PROF_Fxcyl.pdf',
+                        label='$F_X$ cylindrical (erg s$^{-1}$ cm$^{-2}$)', R500=self._R500)
+                
+                # Sx profile
+                rad, prof = self.get_sx_profile(radius, NR500max=NR500max, Npt_los=Npt_los)
+                profile(radius, angle, prof.to('erg s-1 cm-2 sr-1'), self._output_dir+'/PLOT_PROF_Sx.pdf',
+                        label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=self._R500)
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip Xray flux and Sx')
+                
+        #---------- Spectra
+        if 'all' in prod_list or 'spectra' in prod_list:
+            # CR protons
+            eng, spec = self.get_crp_spectrum(energy, Rmax=Rmax)
+            spectra(energy, spec.to('GeV-1'), self._output_dir+'/PLOT_SPEC_CRproton.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
+            
+            # Spherically integrated gamma ray
+            eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical', NR500max=NR500max, Npt_los=Npt_los)
+            spectra(energy, (energy**2*spec).to('GeV cm-2 s-1'), self._output_dir+'/PLOT_SPEC_Fgamma_sph.pdf',
+                    label='Spherical $F_{\\gamma}$ (GeV cm$^{-2}$ s$^{-1}$)')
+            
+            # Cylindrically integrated gamma ray
+            eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='cylindrical', NR500max=NR500max, Npt_los=Npt_los)
+            spectra(energy, (energy**2*spec).to('GeV cm-2 s-1'), self._output_dir+'/PLOT_SPEC_Fgamma_cyl.pdf',
+                    label='Cylindrical $F_{\\gamma}$ (GeV cm$^{-2}$ s$^{-1}$)')
+            
+        #---------- Map
+        if 'all' in prod_list or 'map' in prod_list:
+            header = self.get_map_header()
+
+            # ymap
+            image = self.get_ymap(NR500max=NR500max, Npt_los=Npt_los).to_value('adu')
+            maps(image*1e6, header, self._output_dir+'/PLOT_MAP_ycompon.pdf',
+                 label='Compton parameter $\\times 10^{6}$', coord=self._coord, theta_500=self._theta500,
+                 theta_trunc=self._theta_truncation, logscale=True)
+        
+            # gamma    
+            image = self.get_gamma_template_map(NR500max=NR500max, Npt_los=Npt_los).to_value('sr-1')
+            maps(image, header, self._output_dir+'/PLOT_MAP_gamma_template.pdf', label='$\\gamma$-ray template (sr$^{-1}$)',
+                 coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
+            
+            # Sx map
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                image = self.get_sxmap(NR500max=NR500max, Npt_los=Npt_los).to_value('erg s-1 cm-2 sr-1')
+                maps(image, header, self._output_dir+'/PLOT_MAP_Sx.pdf', label='$S_X$ (erg s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
+                     coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip sx_map')
                 
 
