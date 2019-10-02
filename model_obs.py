@@ -23,7 +23,7 @@ from ClusterTools import map_tools
 
 
 #==================================================
-# Physics class
+# Observable class
 #==================================================
 
 class Observables(object):

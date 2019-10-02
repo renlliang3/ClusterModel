@@ -1,5 +1,7 @@
+
 """
-This script contains plotting tools associated with the cluster class.
+This file contain a subclass of the model.py module and Cluster class. It
+is dedicated to the computing of observables.
 
 """
 

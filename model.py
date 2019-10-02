@@ -158,7 +158,6 @@ class Cluster(Admin, Physics, Observables, Plots):
                                                          self._redshift, delta=500, cosmo=self._cosmo)*u.kpc
         self._theta500 = ((self._R500 / self._D_ang).to('') * u.rad).to('deg')
 
-        #---------- Thermal gas physics
         # Cluster boundery
         self._R_truncation     = 3*self._R500
         self._theta_truncation = ((self._R_truncation / self._D_ang).to('') * u.rad).to('deg')
@@ -169,7 +168,8 @@ class Cluster(Admin, Physics, Observables, Plots):
 
         # HSE bias
         self._hse_bias = 0.2
-        
+
+        #---------- Physical properties
         # Electronic pressure
         Pnorm = cluster_global.gNFW_normalization(self._redshift, self._M500.to_value('Msun'), cosmo=self._cosmo)
         pppar = [6.410, 1.810, 0.3100, 1.3300, 4.1300]
@@ -191,7 +191,7 @@ class Cluster(Admin, Physics, Observables, Plots):
                                    "gamma"  : 3.0,
                                    "epsilon": 0.0}
 
-        #---------- Cosmic ray physics
+        # Cosmic ray protons
         self._X_cr = {'X':0.01, 'Rcut':self._R500}
         self._nuclear_enhancement = True
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
@@ -203,6 +203,17 @@ class Cluster(Admin, Physics, Observables, Plots):
         self._spectrum_crp_model = {'name'       : 'PowerLaw',
                                     'PivotEnergy': 1.0*u.TeV,
                                     'Index'      : 2.5}
+
+        # Magnetic fields
+        #self._mag_field_model = {"name"   : "SVM",
+        #                         "B_0"    : 1e-6*u.Unit('G'),
+        #                         "r_c"    : 500.0*u.kpc,
+        #                         "beta"   : 0.75,
+        #                         "r_s"    : 800.0*u.kpc,
+        #                         "alpha"  : 0.6,
+        #                         "gamma"  : 3.0,
+        #                         "epsilon": 0.0}
+        
         
         #---------- Sampling
         self._map_header = None
