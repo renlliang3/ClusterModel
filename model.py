@@ -40,7 +40,6 @@ class Cluster(Admin, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Include EBL in gamma spectrum
     - Include cluster metallicity instead of local abundances for nuclear enhancement
     - Compute the secondary electron/positrons
     - Include the magnetic field profile
@@ -158,6 +157,9 @@ class Cluster(Admin, Physics, Observables, Plots):
                                                          self._redshift, delta=500, cosmo=self._cosmo)*u.kpc
         self._theta500 = ((self._R500 / self._D_ang).to('') * u.rad).to('deg')
 
+        # Extragalactic background light
+        self._EBL_model = 'dominguez'
+        
         # Cluster boundery
         self._R_truncation     = 3*self._R500
         self._theta_truncation = ((self._R_truncation / self._D_ang).to('') * u.rad).to('deg')
@@ -282,6 +284,11 @@ class Cluster(Admin, Physics, Observables, Plots):
         if not self._silent: print("Getting theta500 value")
         return self._theta500
 
+    @property
+    def EBL_model(self):
+        if not self._silent: print("Getting the EBL model value")
+        return self._EBL_model
+    
     #========== Thermal gas physics
     @property
     def R_truncation(self):
@@ -538,7 +545,25 @@ class Cluster(Admin, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting theta500 value")
         if not self._silent: print("Setting: R500, M500 ; Fixing: redshift, cosmo, D_ang")
+
+    @EBL_model.setter
+    def EBL_model(self, value):
+        ebllist = ['none', 'franceschini', 'kneiske', 'finke',
+                   'dominguez', 'dominguez-upper', 'dominguez-lower',
+                   'inuoe', 'inuoe-low-pop3', 'inuoe-up-pop3', 'gilmore', 'gilmore-fixed']
+        # check value
+        if type(value) == str:
+            if not value in ebllist:
+                raise ValueError("This EBL model is not available")
+        else:
+            raise TypeError("The EBL model should be a string")
+
+        # Setting parameters
+        self._EBL_model = value
         
+        # Information
+        if not self._silent: print("Setting EBL_model value")
+
     #========== Thermal gas physics
     @R_truncation.setter
     def R_truncation(self, value):

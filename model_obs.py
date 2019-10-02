@@ -13,6 +13,7 @@ import scipy.ndimage as ndimage
 import astropy.units as u
 from astropy.wcs import WCS
 from astropy import constants as const
+from ebltable.tau_from_model import OptDepth
 
 import naima
 
@@ -397,6 +398,12 @@ class Observables(object):
         # Compute the spectrum, within Rcut, assuming 1cm-3 gas, normalize by the energy computation volume and multiply by volume term
         dN_dEdSdt = (V_ncr_ngas/V_CRenergy).to_value('')*gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
 
+        #---------- Apply EBL absorbtion
+        if self._EBL_model != 'none':
+            tau    = OptDepth.readmodel(model=self._EBL_model)
+            absorb = np.exp(-1. * tau.opt_depth(self._redshift, energy.to_value('TeV')))
+            dN_dEdSdt = dN_dEdSdt * absorb
+        
         return energy, dN_dEdSdt.to('MeV-1 cm-2 s-1')
 
     
@@ -450,10 +457,17 @@ class Observables(object):
         radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
         V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1, self._X_cr['Rcut'].to_value('kpc'))*u.kpc**3
         
-        # Compute the spectral part and integrate
+        # Compute the spectral part
         energy = np.logspace(np.log10(Emin.to_value('GeV')), np.log10(Emax.to_value('GeV')), 1000)*u.GeV
         dN_dEdSdt = gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
-        
+
+        # Apply EBL absorbtion
+        if self._EBL_model != 'none':
+            tau    = OptDepth.readmodel(model=self._EBL_model)
+            absorb = np.exp(-1. * tau.opt_depth(self._redshift, energy.to_value('TeV')))
+            dN_dEdSdt = dN_dEdSdt * absorb
+
+        # and integrate over energy
         if Energy_density:
             dN_dSdt = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
                                                              energy.to_value('GeV')*dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
@@ -524,7 +538,7 @@ class Observables(object):
         
         energy = np.logspace(np.log10(Emin.to_value('GeV')),np.log10(Emax.to_value('GeV')),1000)*u.GeV
         energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral=type_integral, NR500max=NR500max, Npt_los=Npt_los)
-
+        
         if Energy_density:
             flux = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
                                                           energy.to_value('GeV')*dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
@@ -607,8 +621,6 @@ class Observables(object):
         
         return gamma_template_norm.to('sr-1')
 
-
-                    
     
     #==================================================
     # Compute a Xspec table versus temperature
