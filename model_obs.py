@@ -668,7 +668,8 @@ class Observables(object):
             raise ValueError("You ask for an output in ph/s/sr (i.e. including instrumental response), but the xspec table was generated without response file.")
 
         # Get the integrand
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
         constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
 
         if output_type == 'S':
@@ -746,7 +747,8 @@ class Observables(object):
         dC_xspec, dS_xspec, dR_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
         
         #---------- Get the integrand
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
         constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
         if output_type == 'S':
             integrand = constant.to_value('kpc-2')*dS_xspec.to_value('erg cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p

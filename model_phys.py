@@ -493,7 +493,8 @@ class Physics(object):
             radius = np.array([radius.to_value()]) * radius.unit
         
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
 
         #---------- Get the electron density profile
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -664,8 +665,9 @@ class Physics(object):
             radius = np.array([radius.to_value()]) * radius.unit
 
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
-
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        
         #---------- Define radius associated to the density
         dens_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
         
@@ -737,7 +739,8 @@ class Physics(object):
             radius = np.array([radius.to_value()]) * radius.unit
 
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(self._helium_mass_fraction)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
 
         #---------- Define radius associated to the pressure
         press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc

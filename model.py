@@ -40,7 +40,7 @@ class Cluster(Admin, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Include cluster metallicity instead of local abundances for nuclear enhancement
+    - Include new Kafexhiu2014 class instead of Naima
     - Compute the secondary electron/positrons
     - Include the magnetic field profile
     - Compute the radio synchrotron emission from secondaries
@@ -68,7 +68,8 @@ class Cluster(Admin, Physics, Observables, Plots):
     - R_truncation (quantity): the radius at which the cluster stops (similar as virial radius)
     - theta_truncation (quantity): the angle corresponding to R_truncation.
     - helium_mass_fraction (float): the helium mass fraction of the gas (==Yp~0.25 in BBN)
-    - abundance (float): the abundance in unit of Zsun
+    - metallicity_sol (float): the metallicity (default is Zprotosun == 0.0153)
+    - abundance (float): the abundance (default is 0.3) in unit of Zprotosun
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
     - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
     profile. It contains the name of the model and the associated model parameters. 
@@ -164,8 +165,9 @@ class Cluster(Admin, Physics, Observables, Plots):
         self._R_truncation     = 3*self._R500
         self._theta_truncation = ((self._R_truncation / self._D_ang).to('') * u.rad).to('deg')
         
-        # He fraction and metal abundances (in unit of Z_sun)
-        self._helium_mass_fraction = 0.245
+        # He fraction and metallicity (default: protosolar from Lodders et al 2009: arxiv0901.1149)
+        self._helium_mass_fraction = 0.2735
+        self._metallicity_sol = 0.0153
         self._abundance = 0.3
 
         # HSE bias
@@ -309,6 +311,11 @@ class Cluster(Admin, Physics, Observables, Plots):
     def abundance(self):
         if not self._silent: print("Getting the abundance value")
         return self._abundance
+
+    @property
+    def metallicity_sol(self):
+        if not self._silent: print("Getting the metallicity_sol value")
+        return self._metallicity_sol
 
     @property
     def hse_bias(self):
@@ -615,6 +622,20 @@ class Cluster(Admin, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting helium mass fraction value")
         
+    @metallicity_sol.setter
+    def metallicity_sol(self, value):
+        # Check value
+        if type(value) == float:
+            if value >= 0.0:
+                self._metallicity_sol = value
+            else:
+                raise ValueError("The metallicity should be >= 0")
+        else:
+            raise TypeError("The metallicity should be a float")
+        
+        # Information
+        if not self._silent: print("Setting metallicity value")
+
     @abundance.setter
     def abundance(self, value):
         # Check value
@@ -628,6 +649,7 @@ class Cluster(Admin, Physics, Observables, Plots):
         
         # Information
         if not self._silent: print("Setting abundance value")
+        
         
     @hse_bias.setter
     def hse_bias(self, value):
