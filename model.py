@@ -41,7 +41,8 @@ class Cluster(Admin, Physics, Observables, Plots):
     To do list
     ----------  
     - Include new Kafexhiu2014 class instead of Naima
-    - Compute the secondary electron/positrons
+    - Compute the secondary electron/positrons rate
+    - Compute number density of secondary electrons/positron
     - Include the magnetic field profile
     - Compute the radio synchrotron emission from secondaries
     
