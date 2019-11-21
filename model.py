@@ -42,9 +42,9 @@ class Cluster(Admin, Physics, Observables, Plots):
     ----------  
     - Include new Kafexhiu2014 class instead of Naima
     - Include neutrinos
-    - Compute the secondary electron/positrons rate
-    - Compute number density of secondary electrons/positron
-    - Compute the radio synchrotron emission from secondaries
+    - Include number density of secondary electrons/positron
+    - Include the radio synchrotron emission from secondaries
+    - Include the inverse Compton emission from secondaries
     
     Attributes
     ----------  
