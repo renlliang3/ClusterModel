@@ -49,6 +49,8 @@ class Physics(object):
     pressure profile GNFW parameters by the ones given by the user.
     - set_pressure_gas_isoT_param(self, kBT): set the pressure profile so that the cluster is 
     iso-thermal
+    - set_density_gas_isoT_param(self, kBT): set the density profile so that the cluster is 
+    iso-thermal
 
     - get_pressure_gas_profile(self, radius=np.logspace(1,5,1000)*u.kpc): compute the electron
     gas pressure profile.
@@ -385,7 +387,7 @@ class Physics(object):
 
 
     #==================================================
-    # Set a given pressure UPP profile
+    # Set a given pressure isothermal profile
     #==================================================
     
     def set_pressure_gas_isoT_param(self, kBT):
@@ -427,7 +429,51 @@ class Physics(object):
 
         self._pressure_gas_model = Ppar
 
+
+    #==================================================
+    # Set a given density isothermal profile
+    #==================================================
     
+    def set_density_gas_isoT_param(self, kBT):
+        """
+        Set the parameters of the density profile so that 
+        the cluster is iso thermal
+        
+        Parameters
+        ----------
+        - kBT (quantity): isothermal temperature
+
+        """
+
+        # check type of temperature
+        try:
+            test = kBT.to('keV')
+        except:
+            raise TypeError("The temperature should be a quantity homogeneous to keV.")
+
+        # Get the density parameters
+        Ppar = self._pressure_gas_model.copy()
+
+        # Modify the parameters depending on the model
+        if self._pressure_gas_model['name'] == 'GNFW':
+            Ppar['P_0'] = (Ppar['P_0'] / kBT).to('cm-3')
+            
+        elif self._pressure_gas_model['name'] == 'SVM':
+            Ppar['n_0'] = (Ppar['n_0'] / kBT).to('cm-3')
+
+        elif self._pressure_gas_model['name'] == 'beta':
+            Ppar['n_0'] = (Ppar['n_0'] / kBT).to('cm-3')
+
+        elif self._pressure_gas_model['name'] == 'doublebeta':
+            Ppar['n_01'] = (Ppar['n_01'] / kBT).to('cm-3')
+            Ppar['n_02'] = (Ppar['n_02'] / kBT).to('cm-3')
+
+        else:
+            raise ValueError('Problem with density model list.')
+
+        self._density_gas_model = Ppar
+
+        
     #==================================================
     # Get the gas electron pressure profile
     #==================================================
