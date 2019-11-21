@@ -90,6 +90,7 @@ class Observables(object):
         # Get the needed parameters in case of map header
         if self._map_header != None:
             header = self._map_header
+            
         # Get the needed parameters in case of set-by-hand map parameters
         elif (self._map_coord != None) and (self._map_reso != None) and (self._map_fov != None):
             header = map_tools.define_std_header(self._map_coord.icrs.ra.to_value('deg'),
@@ -97,9 +98,10 @@ class Observables(object):
                                                  self._map_fov.to_value('deg')[0],
                                                  self._map_fov.to_value('deg')[1],
                                                  self._map_reso.to_value('deg'))
+            
         # Otherwise there is a problem
         else:
-            raise TypeError("A header, or the map_{coord & reso & fov} should be defined.")
+            raise TypeError("A header, or the map_coord & map_reso & map_fov should be defined.")
 
         return header        
         

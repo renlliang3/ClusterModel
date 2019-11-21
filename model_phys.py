@@ -38,14 +38,17 @@ class Physics(object):
 
     Methods
     ----------  
+    - _get_generic_profile(self, radius, model, derivative=False): get any profile base on model type
+
     - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
     nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
     when getting profiles and maps
     - itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
 
-
     - set_pressure_gas_gNFW_param(self, pressure_model='P13UPP'): replace the electron gas 
     pressure profile GNFW parameters by the ones given by the user.
+    - set_pressure_gas_isoT_param(self, kBT): set the pressure profile so that the cluster is 
+    iso-thermal
 
     - get_pressure_gas_profile(self, radius=np.logspace(1,5,1000)*u.kpc): compute the electron
     gas pressure profile.
@@ -80,7 +83,112 @@ class Physics(object):
     - get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
     compute the cosmic ray proton energy (between Emin and Emax) to thermal energy profile.
 
+    - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
+
     """
+
+    #==================================================
+    # Get the generic model profile
+    #==================================================
+
+    def _get_generic_profile(self, radius, model, derivative=False):
+        """
+        Get the generic profile profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - p_r (quantity): the profile
+
+        """
+
+        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta']
+
+        if not model['name'] in model_list:
+            print('The profile model can :')
+            print(model_list)
+            raise ValueError("The requested model has not been implemented")
+
+        r3d_kpc = radius.to_value('kpc')
+
+        #---------- Case of GNFW profile
+        if model['name'] == 'GNFW':
+            unit = model["P_0"].unit
+            
+            P0 = model["P_0"].to_value(unit)
+            rp = model["r_p"].to_value('kpc')
+            a  = model["a"]
+            b  = model["b"]
+            c  = model["c"]
+
+            if derivative:
+                prof_r = cluster_profile.gNFW_model_derivative(r3d_kpc, P0, rp,
+                                                               slope_a=a, slope_b=b, slope_c=c) * unit*u.Unit('kpc-1')
+            else:
+                prof_r = cluster_profile.gNFW_model(r3d_kpc, P0, rp, slope_a=a, slope_b=b, slope_c=c)*unit
+
+        #---------- Case of SVM model
+        elif model['name'] == 'SVM':
+            unit = model["n_0"].unit
+            
+            n0      = model["n_0"].to_value(unit)
+            rc      = model["r_c"].to_value('kpc')
+            rs      = model["r_s"].to_value('kpc')
+            alpha   = model["alpha"]
+            beta    = model["beta"]
+            gamma   = model["gamma"]
+            epsilon = model["epsilon"]
+
+            if derivative:
+                prof_r = cluster_profile.svm_model_derivative(r3d_kpc, n0, rc, beta,
+                                                              rs, gamma, epsilon, alpha) * unit*u.Unit('kpc-1')
+            else:
+                prof_r = cluster_profile.svm_model(r3d_kpc, n0, rc, beta, rs, gamma, epsilon, alpha)*unit
+
+        #---------- beta model
+        elif model['name'] == 'beta':
+            unit = model["n_0"].unit
+
+            n0      = model["n_0"].to_value(unit)
+            rc      = model["r_c"].to_value('kpc')
+            beta    = model["beta"]
+
+            if derivative:
+                prof_r = cluster_profile.beta_model_derivative(r3d_kpc, n0, rc, beta) * unit*u.Unit('kpc-1')
+            else:
+                prof_r = cluster_profile.beta_model(r3d_kpc, n0, rc, beta)*unit
+            
+        #---------- double beta model
+        elif model['name'] == 'doublebeta':
+            unit1 = model["n_01"].unit
+            unit2 = model["n_02"].unit
+
+            n01      = model["n_01"].to_value(unit1)
+            rc1      = model["r_c1"].to_value('kpc')
+            beta1    = model["beta1"]
+            n02      = model["n_02"].to_value(unit2)
+            rc2      = model["r_c2"].to_value('kpc')
+            beta2    = model["beta2"]
+
+            if derivative:
+                prof_r1 = cluster_profile.beta_model_derivative(r3d_kpc, n01, rc1, beta1) * unit1*u.Unit('kpc-1')
+                prof_r2 = cluster_profile.beta_model_derivative(r3d_kpc, n02, rc2, beta2) * unit2*u.Unit('kpc-1')
+                prof_r = prof_r1 + prof_r2
+            else:
+                prof_r1 = cluster_profile.beta_model(r3d_kpc, n01, rc1, beta1)*unit1
+                prof_r2 = cluster_profile.beta_model(r3d_kpc, n02, rc2, beta2)*unit2
+                prof_r = prof_r1 + prof_r2
+            
+        #---------- Otherwise nothing is done
+        else :
+            if not self._silent: print('The requested model has not been implemented.')
+
+        return prof_r
+
     
     #==================================================
     # Compute a Xspec table versus temperature
@@ -275,7 +383,51 @@ class Physics(object):
                                     "b":pppar[4],
                                     "c":pppar[2]}
 
+
+    #==================================================
+    # Set a given pressure UPP profile
+    #==================================================
+    
+    def set_pressure_gas_isoT_param(self, kBT):
+        """
+        Set the parameters of the pressure profile so that 
+        the cluster is iso thermal
         
+        Parameters
+        ----------
+        - kBT (quantity): isothermal temperature
+
+        """
+
+        # check type of temperature
+        try:
+            test = kBT.to('keV')
+        except:
+            raise TypeError("The temperature should be a quantity homogeneous to keV.")
+
+        # Get the density parameters
+        Ppar = self._density_gas_model.copy()
+
+        # Modify the parameters depending on the model
+        if self._density_gas_model['name'] == 'GNFW':
+            Ppar['P_0'] = (Ppar['P_0'] * kBT).to('keV cm-3')
+            
+        elif self._density_gas_model['name'] == 'SVM':
+            Ppar['n_0'] = (Ppar['n_0'] * kBT).to('keV cm-3')
+
+        elif self._density_gas_model['name'] == 'beta':
+            Ppar['n_0'] = (Ppar['n_0'] * kBT).to('keV cm-3')
+
+        elif self._density_gas_model['name'] == 'doublebeta':
+            Ppar['n_01'] = (Ppar['n_01'] * kBT).to('keV cm-3')
+            Ppar['n_02'] = (Ppar['n_02'] * kBT).to('keV cm-3')
+
+        else:
+            raise ValueError('Problem with density model list.')
+
+        self._pressure_gas_model = Ppar
+
+    
     #==================================================
     # Get the gas electron pressure profile
     #==================================================
@@ -298,32 +450,13 @@ class Physics(object):
         # In case the input is not an array
         if type(radius.to_value()) == float:
             radius = np.array([radius.to_value()]) * radius.unit
-            
-        # Case of GNFW profile
-        if self._pressure_gas_model['name'] == 'GNFW':
-            P0 = self._pressure_gas_model["P_0"].to_value('keV cm-3')
-            rp = self._pressure_gas_model["r_p"].to_value('kpc')
-            a  = self._pressure_gas_model["a"]
-            b  = self._pressure_gas_model["b"]
-            c  = self._pressure_gas_model["c"]
-            r3d_kpc = radius.to_value('kpc')
-            p_r = cluster_profile.gNFW_model(r3d_kpc, P0, rp, slope_a=a, slope_b=b, slope_c=c)
-            
-            p_r[radius > self._R_truncation] *= 0
-            return radius, p_r*u.Unit('keV cm-3')
 
-        # Case of isoT model
-        elif self._pressure_gas_model['name'] == 'isoT':
-            radius, n_r = self.get_density_gas_profile(radius=radius)
-            p_r = n_r * self._pressure_gas_model['T']
+        # get profile
+        p_r = self._get_generic_profile(radius, self._pressure_gas_model)
+        p_r[radius > self._R_truncation] *= 0
 
-            p_r[radius > self._R_truncation] *= 0
-            return radius, p_r.to('keV cm-3')
+        return radius, p_r.to('keV cm-3')
             
-        # Otherwise nothing is done
-        else :
-            if not self._silent: print('Only the GNFW and isoT pressure profile is available for now.')
-
             
     #==================================================
     # Get the gas electron density profile
@@ -348,52 +481,12 @@ class Physics(object):
         if type(radius.to_value()) == float:
             radius = np.array([radius.to_value()]) * radius.unit
 
-        # Case of SVM profile
-        if self._density_gas_model['name'] == 'SVM':
-            n0      = self._density_gas_model["n_0"].to_value('cm-3')
-            rc      = self._density_gas_model["r_c"].to_value('kpc')
-            rs      = self._density_gas_model["r_s"].to_value('kpc')
-            alpha   = self._density_gas_model["alpha"]
-            beta    = self._density_gas_model["beta"]
-            gamma   = self._density_gas_model["gamma"]
-            epsilon = self._density_gas_model["epsilon"]
-            r3d_kpc = radius.to_value('kpc')
-            n_r = cluster_profile.svm_model(r3d_kpc, n0, rc, beta, rs, gamma, epsilon, alpha)
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.Unit('cm-3')
-
-        # beta model
-        elif self._density_gas_model['name'] == 'beta':
-            n0      = self._density_gas_model["n_0"].to_value('cm-3')
-            rc      = self._density_gas_model["r_c"].to_value('kpc')
-            beta    = self._density_gas_model["beta"]
-            r3d_kpc = radius.to_value('kpc')
-            n_r = cluster_profile.beta_model(r3d_kpc, n0, rc, beta)
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.Unit('cm-3')
-
-        # double beta model
-        elif self._density_gas_model['name'] == 'doublebeta':
-            n01      = self._density_gas_model["n_01"].to_value('cm-3')
-            rc1      = self._density_gas_model["r_c1"].to_value('kpc')
-            beta1    = self._density_gas_model["beta1"]
-            n02      = self._density_gas_model["n_02"].to_value('cm-3')
-            rc2      = self._density_gas_model["r_c2"].to_value('kpc')
-            beta2    = self._density_gas_model["beta2"]
-            r3d_kpc = radius.to_value('kpc')
-            n_r1 = cluster_profile.beta_model(r3d_kpc, n01, rc1, beta1)
-            n_r2 = cluster_profile.beta_model(r3d_kpc, n02, rc2, beta2)
-            n_r = n_r1 + n_r2
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.Unit('cm-3')
-
-        # Otherwise nothing is done
-        else :
-            if not self._silent: print('Only the SVM, beta and doublebeta density profile are available for now.')
-
+        # get profile
+        n_r = self._get_generic_profile(radius, self._density_gas_model)
+        n_r[radius > self._R_truncation] *= 0
+        
+        return radius, n_r.to('cm-3')
+    
             
     #==================================================
     # Get the gas electron temperature profile
@@ -500,65 +593,8 @@ class Physics(object):
         radius, n_r = self.get_density_gas_profile(radius=radius)
 
         #---------- Get dP/dr
-        # Case of GNFW profile
-        if self._pressure_gas_model['name'] == 'GNFW':
-            P0 = self._pressure_gas_model["P_0"].to_value('keV cm-3')
-            rp = self._pressure_gas_model["r_p"].to_value('kpc')
-            a  = self._pressure_gas_model["a"]
-            b  = self._pressure_gas_model["b"]
-            c  = self._pressure_gas_model["c"]
-            r3d_kpc = radius.to_value('kpc')
-            dpdr_r = cluster_profile.gNFW_model_derivative(r3d_kpc, P0, rp, slope_a=a, slope_b=b, slope_c=c) * u.Unit('keV cm-3 kpc-1')
-            dpdr_r[radius > self._R_truncation] *= 0
-
-        # Case of isoT model
-        elif self._pressure_gas_model['name'] == 'isoT':
-
-            # Case of SVM profile
-            if self._density_gas_model['name'] == 'SVM':
-                n0      = self._density_gas_model["n_0"].to_value('cm-3')
-                rc      = self._density_gas_model["r_c"].to_value('kpc')
-                rs      = self._density_gas_model["r_s"].to_value('kpc')
-                alpha   = self._density_gas_model["alpha"]
-                beta    = self._density_gas_model["beta"]
-                gamma   = self._density_gas_model["gamma"]
-                epsilon = self._density_gas_model["epsilon"]
-                r3d_kpc = radius.to_value('kpc')
-                dndr_r = cluster_profile.svm_model_derivative(r3d_kpc, n0, rc, beta, rs, gamma, epsilon, alpha) * u.Unit('cm-3 kpc-1')
-                dndr_r[radius > self._R_truncation] *= 0
-
-                # beta model
-            elif self._density_gas_model['name'] == 'beta':
-                n0      = self._density_gas_model["n_0"].to_value('cm-3')
-                rc      = self._density_gas_model["r_c"].to_value('kpc')
-                beta    = self._density_gas_model["beta"]
-                r3d_kpc = radius.to_value('kpc')
-                dndr_r = cluster_profile.beta_model_derivative(r3d_kpc, n0, rc, beta) * u.Unit('cm-3 kpc-1')
-                dndr_r[radius > self._R_truncation] *= 0
-
-                # double beta model
-            elif self._density_gas_model['name'] == 'doublebeta':
-                n01      = self._density_gas_model["n_01"].to_value('cm-3')
-                rc1      = self._density_gas_model["r_c1"].to_value('kpc')
-                beta1    = self._density_gas_model["beta1"]
-                n02      = self._density_gas_model["n_02"].to_value('cm-3')
-                rc2      = self._density_gas_model["r_c2"].to_value('kpc')
-                beta2    = self._density_gas_model["beta2"]
-                r3d_kpc = radius.to_value('kpc')
-                dndr_r1 = cluster_profile.beta_model_derivative(r3d_kpc, n01, rc1, beta1) * u.Unit('cm-3 kpc-1')
-                dndr_r2 = cluster_profile.beta_model_derivative(r3d_kpc, n02, rc2, beta2) * u.Unit('cm-3 kpc-1')
-                dndr_r = dndr_r1 + dndr_r2
-                dndr_r[radius > self._R_truncation] *= 0
-
-            # Otherwise nothing is done
-            else :
-                if not self._silent: print('Only the SVM, beta and doublebeta density profile are available for now.')
-
-            dpdr_r = (dndr_r * self._pressure_gas_model['T']).to('keV cm-3 kpc-1')
-
-        # Otherwise nothing is done
-        else :
-            if not self._silent: print('Only the GNFW and isoT pressure profile is available for now.')
+        dpdr_r = self._get_generic_profile(radius, self._pressure_gas_model, derivative=True)
+        dpdr_r[radius > self._R_truncation] *= 0
 
         #---------- Compute the mass
         n_r[n_r <= 0] = np.nan
@@ -783,61 +819,11 @@ class Physics(object):
         if type(radius.to_value()) == float:
             radius = np.array([radius.to_value()]) * radius.unit
 
-        # Case of SVM profile
-        if self._density_crp_model['name'] == 'SVM':
-            rc      = self._density_crp_model["r_c"].to_value('kpc')
-            rs      = self._density_crp_model["r_s"].to_value('kpc')
-            alpha   = self._density_crp_model["alpha"]
-            beta    = self._density_crp_model["beta"]
-            gamma   = self._density_crp_model["gamma"]
-            epsilon = self._density_crp_model["epsilon"]
-            r3d_kpc = radius.to_value('kpc')
-            n_r = cluster_profile.svm_model(r3d_kpc, 1.0, rc, beta, rs, gamma, epsilon, alpha)
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.adu
-
-        # beta model
-        elif self._density_crp_model['name'] == 'beta':
-            rc      = self._density_crp_model["r_c"].to_value('kpc')
-            beta    = self._density_crp_model["beta"]
-            r3d_kpc = radius.to_value('kpc')
-            n_r = cluster_profile.beta_model(r3d_kpc, 1.0, rc, beta)
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.adu
-
-        # double beta model
-        elif self._density_crp_model['name'] == 'doublebeta':
-            n01      = self._density_crp_model["n_01"]
-            rc1      = self._density_crp_model["r_c1"].to_value('kpc')
-            beta1    = self._density_crp_model["beta1"]
-            n02      = self._density_crp_model["n_02"]
-            rc2      = self._density_crp_model["r_c2"].to_value('kpc')
-            beta2    = self._density_crp_model["beta2"]
-            r3d_kpc  = radius.to_value('kpc')
-            n_r1 = cluster_profile.beta_model(r3d_kpc, n01/(n01+n02), rc1, beta1)
-            n_r2 = cluster_profile.beta_model(r3d_kpc, n02/(n01+n02), rc2, beta2)
-            n_r = n_r1 + n_r2
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.adu
-
-        # GNFW model
-        elif self._density_crp_model['name'] == 'GNFW':
-            a       = self._density_crp_model["a"]
-            b       = self._density_crp_model["b"]
-            c       = self._density_crp_model["c"]
-            rp      = self._density_crp_model["r_p"].to_value('kpc')
-            r3d_kpc = radius.to_value('kpc')
-            n_r = cluster_profile.gNFW_model(r3d_kpc, 1.0, rp, slope_a=a, slope_b=b, slope_c=c)
-            
-            n_r[radius > self._R_truncation] *= 0
-            return radius, n_r*u.adu
+        # get profile
+        n_r = self._get_generic_profile(radius, self._density_crp_model)
+        n_r[radius > self._R_truncation] *= 0
         
-        # Otherwise nothing is done
-        else :
-            if not self._silent: print('Only the SVM, beta, doublebeta and GNFW density profile are available for now.')
+        return radius, n_r.to('adu')
 
 
     #==================================================
@@ -915,7 +901,8 @@ class Physics(object):
         # Get the spatial form volume
         r3d = cluster_profile.define_safe_radius_array(np.array([Rcut.to_value('kpc')]), Rmin=1.0)*u.kpc
         radius, f_cr_r = self.get_normed_density_crp_profile(r3d)
-        Vcr = cluster_profile.get_volume_any_model(radius.to_value('kpc'), f_cr_r.to_value('adu'), Rcut.to_value('kpc')) * u.Unit('kpc3')
+        Vcr = cluster_profile.get_volume_any_model(radius.to_value('kpc'), f_cr_r.to_value('adu'),
+                                                   Rcut.to_value('kpc')) * u.Unit('kpc3')
         
         # Get the energy enclosed in the spectrum
         energy = np.logspace(np.log10(self._Epmin.to_value('GeV')), np.log10(self._Epmax.to_value('GeV')), 1000) * u.GeV
@@ -1065,3 +1052,34 @@ class Physics(object):
         x_r = U_cr.to_value('GeV') / Uth_r.to_value('GeV')
 
         return radius, x_r*u.adu
+
+
+    #==================================================
+    # Get the gas electron density profile
+    #==================================================
+    
+    def get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+        """
+        Get the magnetic field profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - B_r (quantity): the magnetic field profile in unit of uG
+
+        """
+
+        # In case the input is not an array
+        if type(radius.to_value()) == float:
+            radius = np.array([radius.to_value()]) * radius.unit
+
+        # get profile
+        B_r = self._get_generic_profile(radius, self._magfield_model)
+        B_r[radius > self._R_truncation] *= 0
+        
+        return radius, B_r.to('uG')
+    
