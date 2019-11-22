@@ -125,8 +125,7 @@ class Observables(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         #---------- Define radius associated to the pressure
         press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
@@ -167,8 +166,7 @@ class Observables(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         #---------- Define radius associated to the Compton parameter
         y_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
@@ -211,8 +209,7 @@ class Observables(object):
         """
         
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # Define radius associated to the pressure
         p_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
@@ -649,8 +646,7 @@ class Observables(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # Get the gas density profile
         n_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
@@ -731,8 +727,7 @@ class Observables(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         #---------- Define radius associated to the density/temperature
         press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
@@ -805,8 +800,7 @@ class Observables(object):
         """
         
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         #---------- Define radius associated to the Sx profile
         sx_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
