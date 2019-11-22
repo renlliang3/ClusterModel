@@ -13,9 +13,10 @@ from scipy.optimize import brentq
 import scipy.interpolate as interpolate
 import scipy.ndimage as ndimage
 import os
-
 import astropy.units as u
 from astropy import constants as const
+
+from ClusterModel import model_tools
 
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_profile 
@@ -66,7 +67,7 @@ class Physics(object):
     part of the cosmic ray protons distribution, f(r), in dN/dEdV = A f(r) f(E)
     - get_normed_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV): get the spectral part
     of the cosmic ray proton distribution, f(E), in dN/dEdV = A f(r) f(E)
-    - get_crp_normalization(self): compute the normalization of the cosmic ray proton distribution, 
+    - _get_crp_normalization(self): compute the normalization of the cosmic ray proton distribution, 
     A, in dN/dEdV = A f(r) f(E)
     - get_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None, 
     Energy_density=False): compute the cosmic ray proton density profile integrating over the energy 
@@ -238,8 +239,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # get profile
         p_r = self._get_generic_profile(radius, self._pressure_gas_model)
@@ -268,8 +268,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # get profile
         n_r = self._get_generic_profile(radius, self._density_gas_model)
@@ -298,8 +297,7 @@ class Physics(object):
         """
         
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # Compute n and P
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -335,8 +333,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # Compute n and P
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -372,8 +369,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
         
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
@@ -415,8 +411,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # Compute delta from the mass profile
         r, mhse = self.get_hse_mass_profile(radius)       
@@ -486,10 +481,9 @@ class Physics(object):
         
         """
 
-        #---------- In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
-
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+        
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
                                                                             Z=self._metallicity_sol*self._abundance)
@@ -505,7 +499,7 @@ class Physics(object):
         for i in range(len(radius)):
             I_n_gas_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), n_r.to_value('cm-3'),
                                                                 radius.to_value('kpc')[i], Npt=1000)
-
+        
         Mgas_r = mu_e*const.m_p * I_n_gas_r*u.Unit('cm-3 kpc3')
 
         return radius, Mgas_r.to('Msun')
@@ -531,9 +525,8 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
-
+        radius = model_tools.check_qarray(radius)
+        
         # Compute fgas from Mgas and Mhse
         r, mgas = self.get_gas_mass_profile(radius)
         r, mhse = self.get_hse_mass_profile(radius)       
@@ -561,9 +554,8 @@ class Physics(object):
         """
         
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
-
+        radius = model_tools.check_qarray(radius)
+        
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
                                                                             Z=self._metallicity_sol*self._abundance)
@@ -606,9 +598,8 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
-
+        radius = model_tools.check_qarray(radius)
+        
         # get profile
         n_r = self._get_generic_profile(radius, self._density_crp_model)
         n_r[radius > self._R_truncation] *= 0
@@ -636,38 +627,21 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(energy.to_value()) == float:
-            energy = np.array([energy.to_value()]) * energy.unit
+        energy = model_tools.check_qarray(energy)
 
-        # Case of Power Law spectrum
-        if self._spectrum_crp_model['name'] == 'PowerLaw':
-            index   = self._spectrum_crp_model["Index"]
-            eng_GeV = energy.to_value('GeV')
-            S_E = cluster_spectra.powerlaw_model(eng_GeV, 1.0, index)
-            S_E[energy > self._Epmax] *= 0
-            S_E[energy < self._Epmin] *= 0
-            return energy, S_E*u.adu
-
-        # Case of Exponential Cutoff Power Law
-        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
-            index   = self._spectrum_crp_model["Index"]
-            Ecut   = self._spectrum_crp_model["CutoffEnergy"].to_value('GeV')
-            eng_GeV = energy.to_value('GeV')
-            S_E = cluster_spectra.exponentialcutoffpowerlaw_model(eng_GeV, 1.0, index, Ecut)
-            S_E[energy > self._Epmax] *= 0
-            S_E[energy < self._Epmin] *= 0
-            return energy, S_E*u.adu
-
-        # Otherwise nothing is done
-        else :
-            if not self._silent: print('Only the PowerLaw and ExponentialCutoffPowerLaw spectrum are available for now.')
+        # get spectrum
+        S_E = self._get_generic_spectrum(energy, self._spectrum_crp_model)
+        S_E[energy > self._Epmax] *= 0
+        S_E[energy < self._Epmin] *= 0
+        
+        return energy, S_E*u.adu
 
 
     #==================================================
     # Get the CR proton normalization
     #==================================================
     
-    def get_crp_normalization(self):
+    def _get_crp_normalization(self):
         """
         Compute the normalization of the cosmic ray proton distribution:
         dN/dE/dV = Norm f(E) f(r)
@@ -695,7 +669,9 @@ class Physics(object):
                                                    Rcut.to_value('kpc')) * u.Unit('kpc3')
         
         # Get the energy enclosed in the spectrum
-        energy = np.logspace(np.log10(self._Epmin.to_value('GeV')), np.log10(self._Epmax.to_value('GeV')), 1000) * u.GeV
+        energy = np.logspace(np.log10(self._Epmin.to_value('GeV')),
+                             np.log10(self._Epmax.to_value('GeV')),
+                             1000) * u.GeV
         eng, spectrum = self.get_normed_crp_spectrum(energy)
         Ienergy = cluster_spectra.get_integral_any_model(eng.to_value('GeV'), eng.to_value('GeV')*spectrum.to_value('adu'),
                                                          self._Epmin.to_value('GeV'), self._Epmax.to_value('GeV')) * u.GeV**2
@@ -710,7 +686,8 @@ class Physics(object):
     # Get the CR proton density profile
     #==================================================
     
-    def get_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None, Energy_density=False):
+    def get_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc,
+                                Emin=None, Emax=None, Energy_density=False):
         """
         Compute the cosmic ray proton density profile, integrating energies 
         between Emin and Emax.
@@ -728,20 +705,26 @@ class Physics(object):
         - density (quantity): in unit of cm-3
 
         """
-        
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+
+        # Define energy
         if Emin == None:
             Emin = self._Epmin
         if Emax == None:
-            Emax = self._Epmax
+            Emax = self._Epmax        
             
         # Get the normalization
-        norm = self.get_crp_normalization()
+        norm = self._get_crp_normalization()
         
         # Get the radial form
         rad, f_r = self.get_normed_density_crp_profile(radius)
         
         # Get the energy enclosed in the spectrum
-        energy = np.logspace(np.log10(Emin.to_value('GeV')), np.log10(Emax.to_value('GeV')), 1000) * u.GeV
+        energy = np.logspace(np.log10(Emin.to_value('GeV')),
+                             np.log10(Emax.to_value('GeV')),
+                             1000) * u.GeV
         eng, spectrum = self.get_normed_crp_spectrum(energy)
 
         if Energy_density:
@@ -776,12 +759,13 @@ class Physics(object):
         - spectrum (quantity): in unit of GeV-1
 
         """
-
+        
+        # define radius
         if Rmax == None:
             Rmax = self._R500
-            
+        
         # Get the normalization
-        norm = self.get_crp_normalization()
+        norm = self._get_crp_normalization()
         
         # Get the spatial form volume
         r3d = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
@@ -802,7 +786,8 @@ class Physics(object):
     # Get the CR to thermal energy profile
     #==================================================
     
-    def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
+    def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc,
+                                          Emin=None, Emax=None):
         """
         Compute the X_cr_E profile, i.e. the cosmic ray to thermal energy enclosed within R
         profile.
@@ -820,9 +805,14 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
+        # Define energy
+        if Emin == None:
+            Emin = self._Epmin
+        if Emax == None:
+            Emax = self._Epmax        
+        
         # Thermal energy
         r_uth, Uth_r = self.get_thermal_energy_profile(radius)
 
@@ -864,8 +854,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        if type(radius.to_value()) == float:
-            radius = np.array([radius.to_value()]) * radius.unit
+        radius = model_tools.check_qarray(radius)
 
         # get profile
         B_r = self._get_generic_profile(radius, self._magfield_model)
