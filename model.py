@@ -21,6 +21,7 @@ from ClusterTools import cluster_global
 from ClusterTools import cluster_spectra 
 
 from ClusterModel              import model_title
+from ClusterModel              import model_tools
 from ClusterModel.model_admin  import Admin
 from ClusterModel.model_modpar import Modpar
 from ClusterModel.model_phys   import Physics
@@ -206,7 +207,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._map_reso   = 0.02*u.deg
         self._map_fov    = [5.0, 5.0]*u.deg
         self._map_header = None
-
         
     #==================================================
     # Get the hidden variable
@@ -375,7 +375,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Getting the map header value")
         return self._map_header
 
-    
     #==================================================
     # Defines how the user can pass arguments and interconnections
     #==================================================
@@ -660,7 +659,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Check value
         ebllist = ['none', 'franceschini', 'kneiske', 'finke',
                    'dominguez', 'dominguez-upper', 'dominguez-lower',
-                   'inuoe', 'inuoe-low-pop3', 'inuoe-up-pop3', 'gilmore', 'gilmore-fixed']
+                   'gilmore', 'gilmore-fixed']
         if not value in ebllist:
             print('EBL available models are:')
             print(ebllist)
@@ -826,7 +825,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
         # Continue if ok
         Spar = self._validate_spectrum_model_parameters(value, '')
-        self.spectrum_crp_model = Spar
+        self._spectrum_crp_model = Spar
 
         # Information
         if not self._silent: print("Setting spectrum_crp_model value")
@@ -947,4 +946,3 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting the map header")
         if not self._silent: print("Setting: map_coord, map_reso, map_fov to None, as the header will be used")
-    
