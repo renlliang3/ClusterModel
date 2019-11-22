@@ -1,3 +1,8 @@
+"""
+This file contains the code name.
+
+"""
+
 def show():
     """
     Show the title of the model pipeline. Based on F.R. NIKA soft.
