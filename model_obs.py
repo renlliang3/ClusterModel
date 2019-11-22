@@ -13,7 +13,6 @@ import scipy.ndimage as ndimage
 import astropy.units as u
 from astropy.wcs import WCS
 from astropy import constants as const
-from ebltable.tau_from_model import OptDepth
 
 import naima
 
@@ -354,14 +353,14 @@ class Observables(object):
         gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
 
         # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
-        CRenergy_Rcut = self._X_cr['X'] * self.get_thermal_energy_profile(self._X_cr['Rcut'])[1][0]
+        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
         gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
 
         # Compute the normalization volume and the integration cross density volume
-        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr['Rcut'].to_value('kpc')]), Rmin=1.0)*u.kpc
+        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
         radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
         V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
-                                                          self._X_cr['Rcut'].to_value('kpc'))*u.kpc**3
+                                                          self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
 
         #---------- Compute the integral spherical volume
         if type_integral == 'spherical':
@@ -402,8 +401,7 @@ class Observables(object):
 
         #---------- Apply EBL absorbtion
         if self._EBL_model != 'none':
-            tau    = OptDepth.readmodel(model=self._EBL_model)
-            absorb = np.exp(-1. * tau.opt_depth(self._redshift, energy.to_value('TeV')))
+            absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdSdt = dN_dEdSdt * absorb
         
         return energy, dN_dEdSdt.to('MeV-1 cm-2 s-1')
@@ -451,13 +449,13 @@ class Observables(object):
         gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
 
         # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
-        CRenergy_Rcut = self._X_cr['X'] * self.get_thermal_energy_profile(self._X_cr['Rcut'])[1][0]
+        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
         gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
 
         # Compute the normalization volume and the integration cross density volume
-        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr['Rcut'].to_value('kpc')]), Rmin=1.0)*u.kpc
+        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
         radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
-        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1, self._X_cr['Rcut'].to_value('kpc'))*u.kpc**3
+        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1, self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
         
         # Compute the spectral part
         energy = np.logspace(np.log10(Emin.to_value('GeV')), np.log10(Emax.to_value('GeV')), 1000)*u.GeV
@@ -465,8 +463,7 @@ class Observables(object):
 
         # Apply EBL absorbtion
         if self._EBL_model != 'none':
-            tau    = OptDepth.readmodel(model=self._EBL_model)
-            absorb = np.exp(-1. * tau.opt_depth(self._redshift, energy.to_value('TeV')))
+            absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdSdt = dN_dEdSdt * absorb
 
         # and integrate over energy

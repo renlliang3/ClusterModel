@@ -20,18 +20,19 @@ from astropy.wcs import WCS
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_spectra 
 
-from ClusterModel             import model_title
-from ClusterModel.model_admin import Admin
-from ClusterModel.model_phys  import Physics
-from ClusterModel.model_obs   import Observables
-from ClusterModel.model_plots import Plots
+from ClusterModel              import model_title
+from ClusterModel.model_admin  import Admin
+from ClusterModel.model_modpar import Modpar
+from ClusterModel.model_phys   import Physics
+from ClusterModel.model_obs    import Observables
+from ClusterModel.model_plots  import Plots
 
 
 #==================================================
 # Cluster class
 #==================================================
 
-class Cluster(Admin, Physics, Observables, Plots):
+class Cluster(Admin, Modpar, Physics, Observables, Plots):
     """ Cluster class. 
     This class defines a cluster object. In addition to basic properties such as 
     mass and redshift, it includes the physical properties (e.g. pressure profile, 
@@ -77,24 +78,20 @@ class Cluster(Admin, Physics, Observables, Plots):
     - EBL_model (str): the EBL model to use for gamma rays
 
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
-
-    - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
-    profile. It contains the name of the model and the associated model parameters. 
-    The available models are: 'GNFW', 'isoT'
-    - density_gas_model (dict): the model used for the thermal gas electron density 
-    profile. It contains the name of the model and the associated model parameters. 
-    The available models are: 'SVM', 'beta', 'doublebeta'
-
-    - X_cr_P (dict): the cosmic ray to thermal pressure and the radius used for normalization
+    - X_cr_E (dict): the cosmic ray to thermal energy and the radius used for normalization
     - nuclear_enhancement (bool): compute the pion model with/without nuclear enhancement 
     from local abundances
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
-    - density_crp_model (dict): the definition of the cosmic ray proton radial shape
-    - spectrum_crp_model (dict): the definition of the cosmic ray proton energy shape
 
-    - magfield_model (dict): the definition of the magnetic field profile
+    - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
+    profile. It contains the name of the model and the associated model parameters. 
+    - density_gas_model (dict): the model used for the thermal gas electron density 
+    profile. It contains the name of the model and the associated model parameters. 
+    - density_crp_model (dict): the definition of the cosmic ray proton radial shape
+    - magfield_model (dict): the definition of the magnetic field profile.
+    - spectrum_crp_model (dict): the definition of the cosmic ray proton energy shape
 
     - map_coord (SkyCoord object): the map center coordinates.
     - map_reso (quantity): the map pixel size, homogeneous to degrees.
@@ -108,6 +105,7 @@ class Cluster(Admin, Physics, Observables, Plots):
     ----------  
     Methods are split in the respective files: 
     - model_admin.py
+    - model_modpar.py
     - model_phys.py
     - model_obs.py
     - model_plots.py
@@ -181,52 +179,27 @@ class Cluster(Admin, Physics, Observables, Plots):
         self._EBL_model = 'dominguez'
         
         #---------- Physical properties
-        # HSE bias
         self._hse_bias = 0.2
-
-        # Electronic pressure
-        Pnorm = cluster_global.gNFW_normalization(self._redshift, self._M500.to_value('Msun'), cosmo=self._cosmo)
-        pppar = [6.410, 1.810, 0.3100, 1.3300, 4.1300]
-        self._pressure_gas_model = {"name": "GNFW",
-                                    "P_0" : pppar[0]*Pnorm*u.Unit('keV cm-3'),
-                                    "c500": pppar[1],
-                                    "r_p" : self._R500/pppar[1],
-                                    "a"   : pppar[3],
-                                    "b"   : pppar[4],
-                                    "c"   : pppar[2]}
-        
-        # Electronic density
-        self._density_gas_model = {"name"   : "SVM",
-                                   "n_0"    : 3e-3*u.Unit('cm-3'),
-                                   "r_c"    : 500.0*u.kpc,
-                                   "beta"   : 0.75,
-                                   "r_s"    : 800.0*u.kpc,
-                                   "alpha"  : 0.6,
-                                   "gamma"  : 3.0,
-                                   "epsilon": 0.0}
-
-        # Cosmic ray protons
-        self._X_cr_P = {'X':0.01, 'R_norm':self._R500}
+        self._X_cr_E = {'X':0.01, 'R_norm':self._R500}
         self._nuclear_enhancement = True
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
-        
-        self._density_crp_model = {"name"   : "beta",
-                                   "r_c"    : 100.0*u.kpc,
-                                   "beta"   : 0.75}
+
+        # Initialize the profile model (not useful but for clarity of variables)
+        self._pressure_gas_model = 1
+        self._density_gas_model  = 1
+        self._density_crp_model  = 1
+        self._magfield_model     = 1
+        # Set default model using UPP + isoThermal + isobaric
+        self.set_pressure_gas_gNFW_param(pressure_model='P13UPP')
+        self.set_density_gas_isoT_param(10.0*u.keV)
+        self.set_density_crp_isobaric_scal_param(scal=1.0)
+        self.set_magfield_isobaric_scal_param(Bnorm=10*u.uG, scal=0.5)
+
+        # Cosmic ray protons
         self._spectrum_crp_model = {'name'       : 'PowerLaw',
                                     'PivotEnergy': 1.0*u.TeV,
                                     'Index'      : 2.5}
-
-        # Magnetic fields
-        self._magfield_model = {"name"   : "SVM",
-                                 "B_0"    : 1e-6*u.Unit('G'),
-                                 "r_c"    : 500.0*u.kpc,
-                                 "beta"   : 0.75,
-                                 "r_s"    : 800.0*u.kpc,
-                                 "alpha"  : 0.6,
-                                 "gamma"  : 3.0,
-                                 "epsilon": 0.0}
         
         #---------- Sampling
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
@@ -337,19 +310,9 @@ class Cluster(Admin, Physics, Observables, Plots):
         return self._hse_bias
     
     @property
-    def pressure_gas_model(self):
-        if not self._silent: print("Getting the gas electron pressure profile model value")
-        return self._pressure_gas_model
-    
-    @property
-    def density_gas_model(self):
-        if not self._silent: print("Getting the gas electron density profile model value")
-        return self._density_gas_model
-
-    @property
-    def X_cr_P(self):
-        if not self._silent: print("Getting the cosmic ray / thermal pressure and normalization radius")
-        return self._X_cr_P
+    def X_cr_E(self):
+        if not self._silent: print("Getting the cosmic ray / thermal energy and normalization radius")
+        return self._X_cr_E
 
     @property
     def nuclear_enhancement(self):
@@ -367,19 +330,29 @@ class Cluster(Admin, Physics, Observables, Plots):
         return self._Epmax
 
     @property
+    def pressure_gas_model(self):
+        if not self._silent: print("Getting the gas electron pressure profile model value")
+        return self._pressure_gas_model
+    
+    @property
+    def density_gas_model(self):
+        if not self._silent: print("Getting the gas electron density profile model value")
+        return self._density_gas_model
+
+    @property
     def density_crp_model(self):
         if not self._silent: print("Getting the cosmic ray proton density profile model value")
         return self._density_crp_model
 
     @property
-    def spectrum_crp_model(self):
-        if not self._silent: print("Getting the cosmic ray proton spectrum parameters value")
-        return self._spectrum_crp_model
-
-    @property
     def magfield_model(self):
         if not self._silent: print("Getting the magnetic field profile parameters value")
         return self._magfield_model
+    
+    @property
+    def spectrum_crp_model(self):
+        if not self._silent: print("Getting the cosmic ray proton spectrum parameters value")
+        return self._spectrum_crp_model
     
     #========== Maps parameters
     @property
@@ -712,36 +685,8 @@ class Cluster(Admin, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting hydrostatic mass bias value")
 
-    @pressure_gas_model.setter
-    def pressure_gas_model(self, value):
-        # check type
-        if type(value) != dict :
-            raise TypeError("The pressure gas model should be a dictionary containing the name key and relevant parameters")
-        
-        # Check the input parameters and use it
-        Ppar = self._validate_profile_model_parameters(value, 'keV cm-3')
-        self._pressure_gas_model = Ppar
-        
-        # Information
-        if not self._silent: print("Setting pressure_gas_model value")
-        if not self._silent: print("Fixing: R500")
-
-    @density_gas_model.setter
-    def density_gas_model(self, value):
-        # check type
-        if type(value) != dict :
-            raise TypeError("The density gas model should be a dictionary containing the name key and relevant parameters")
-        
-        # Continue if ok
-        Ppar = self._validate_profile_model_parameters(value, 'cm-3')
-        self._density_gas_model = Ppar
-        
-        # Information
-        if not self._silent: print("Setting density_gas_model value")
-        if not self._silent: print("Fixing: R500")
-
-    @X_cr_P.setter
-    def X_cr_P(self, value):
+    @X_cr_E.setter
+    def X_cr_E(self, value):
         # Check type and content
         if type(value) != dict :
             raise TypeError("The cosmic/thermal energy should be a dictionary as {'X':CR/th fraction, 'R_norm':enclosed radius}.")
@@ -760,14 +705,13 @@ class Cluster(Admin, Physics, Observables, Plots):
                 raise ValueError("The enclosed radius should be > 0")
             
             # Implement
-            self._X_cr_P = {'X':value['X'], 'R_norm':value['R_norm'].to('kpc')}
+            self._X_cr_E = {'X':value['X'], 'R_norm':value['R_norm'].to('kpc')}
             
         else:
             raise TypeError("The cosmic/thermal energy should be a dictionary as {'X':CR/th fraction, 'R_norm':enclosed radius}.")
         
         # Information
         if not self._silent: print("Setting cosmic ray to thermal pressure ratio value")
-
 
     @nuclear_enhancement.setter
     def nuclear_enhancement(self, value):
@@ -816,6 +760,34 @@ class Cluster(Admin, Physics, Observables, Plots):
         
         # Information
         if not self._silent: print("Setting Epmax value")
+
+    @pressure_gas_model.setter
+    def pressure_gas_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The pressure gas model should be a dictionary containing the name key and relevant parameters")
+        
+        # Check the input parameters and use it
+        Ppar = self._validate_profile_model_parameters(value, 'keV cm-3')
+        self._pressure_gas_model = Ppar
+        
+        # Information
+        if not self._silent: print("Setting pressure_gas_model value")
+        if not self._silent: print("Fixing: R500")
+
+    @density_gas_model.setter
+    def density_gas_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The density gas model should be a dictionary containing the name key and relevant parameters")
+        
+        # Continue if ok
+        Ppar = self._validate_profile_model_parameters(value, 'cm-3')
+        self._density_gas_model = Ppar
+        
+        # Information
+        if not self._silent: print("Setting density_gas_model value")
+        if not self._silent: print("Fixing: R500")
         
     @density_crp_model.setter
     def density_crp_model(self, value):
@@ -831,19 +803,6 @@ class Cluster(Admin, Physics, Observables, Plots):
         if not self._silent: print("Setting density_crp_model value")
         if not self._silent: print("Fixing: R500")
 
-    @spectrum_crp_model.setter
-    def spectrum_crp_model(self, value):
-        # check type
-        if type(value) != dict :
-            raise TypeError("The spectrum CRp model should be a dictionary containing the name key and relevant parameters")
-
-        # Continue if ok
-        Spar = self._validate_spectrum_model_parameters(value, '')
-        self.spectrum_crp_model = Spar
-
-        # Information
-        if not self._silent: print("Setting spectrum_crp_model value")
-
     @magfield_model.setter
     def magfield_model(self, value):
         # check type
@@ -858,6 +817,19 @@ class Cluster(Admin, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting magfield_model value")
         if not self._silent: print("Fixing: R500")
+
+    @spectrum_crp_model.setter
+    def spectrum_crp_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The spectrum CRp model should be a dictionary containing the name key and relevant parameters")
+
+        # Continue if ok
+        Spar = self._validate_spectrum_model_parameters(value, '')
+        self.spectrum_crp_model = Spar
+
+        # Information
+        if not self._silent: print("Setting spectrum_crp_model value")
 
     #========== Maps
     @map_coord.setter

@@ -38,19 +38,10 @@ class Physics(object):
 
     Methods
     ----------  
-    - _get_generic_profile(self, radius, model, derivative=False): get any profile base on model type
-
     - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
     nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
     when getting profiles and maps
     - itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
-
-    - set_pressure_gas_gNFW_param(self, pressure_model='P13UPP'): replace the electron gas 
-    pressure profile GNFW parameters by the ones given by the user.
-    - set_pressure_gas_isoT_param(self, kBT): set the pressure profile so that the cluster is 
-    iso-thermal
-    - set_density_gas_isoT_param(self, kBT): set the density profile so that the cluster is 
-    iso-thermal
 
     - get_pressure_gas_profile(self, radius=np.logspace(1,5,1000)*u.kpc): compute the electron
     gas pressure profile.
@@ -84,113 +75,9 @@ class Physics(object):
     spectrum integrating over the volume up to Rmax
     - get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
     compute the cosmic ray proton energy (between Emin and Emax) to thermal energy profile.
-
     - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
 
     """
-
-    #==================================================
-    # Get the generic model profile
-    #==================================================
-
-    def _get_generic_profile(self, radius, model, derivative=False):
-        """
-        Get the generic profile profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - p_r (quantity): the profile
-
-        """
-
-        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta']
-
-        if not model['name'] in model_list:
-            print('The profile model can :')
-            print(model_list)
-            raise ValueError("The requested model has not been implemented")
-
-        r3d_kpc = radius.to_value('kpc')
-
-        #---------- Case of GNFW profile
-        if model['name'] == 'GNFW':
-            unit = model["P_0"].unit
-            
-            P0 = model["P_0"].to_value(unit)
-            rp = model["r_p"].to_value('kpc')
-            a  = model["a"]
-            b  = model["b"]
-            c  = model["c"]
-
-            if derivative:
-                prof_r = cluster_profile.gNFW_model_derivative(r3d_kpc, P0, rp,
-                                                               slope_a=a, slope_b=b, slope_c=c) * unit*u.Unit('kpc-1')
-            else:
-                prof_r = cluster_profile.gNFW_model(r3d_kpc, P0, rp, slope_a=a, slope_b=b, slope_c=c)*unit
-
-        #---------- Case of SVM model
-        elif model['name'] == 'SVM':
-            unit = model["n_0"].unit
-            
-            n0      = model["n_0"].to_value(unit)
-            rc      = model["r_c"].to_value('kpc')
-            rs      = model["r_s"].to_value('kpc')
-            alpha   = model["alpha"]
-            beta    = model["beta"]
-            gamma   = model["gamma"]
-            epsilon = model["epsilon"]
-
-            if derivative:
-                prof_r = cluster_profile.svm_model_derivative(r3d_kpc, n0, rc, beta,
-                                                              rs, gamma, epsilon, alpha) * unit*u.Unit('kpc-1')
-            else:
-                prof_r = cluster_profile.svm_model(r3d_kpc, n0, rc, beta, rs, gamma, epsilon, alpha)*unit
-
-        #---------- beta model
-        elif model['name'] == 'beta':
-            unit = model["n_0"].unit
-
-            n0      = model["n_0"].to_value(unit)
-            rc      = model["r_c"].to_value('kpc')
-            beta    = model["beta"]
-
-            if derivative:
-                prof_r = cluster_profile.beta_model_derivative(r3d_kpc, n0, rc, beta) * unit*u.Unit('kpc-1')
-            else:
-                prof_r = cluster_profile.beta_model(r3d_kpc, n0, rc, beta)*unit
-            
-        #---------- double beta model
-        elif model['name'] == 'doublebeta':
-            unit1 = model["n_01"].unit
-            unit2 = model["n_02"].unit
-
-            n01      = model["n_01"].to_value(unit1)
-            rc1      = model["r_c1"].to_value('kpc')
-            beta1    = model["beta1"]
-            n02      = model["n_02"].to_value(unit2)
-            rc2      = model["r_c2"].to_value('kpc')
-            beta2    = model["beta2"]
-
-            if derivative:
-                prof_r1 = cluster_profile.beta_model_derivative(r3d_kpc, n01, rc1, beta1) * unit1*u.Unit('kpc-1')
-                prof_r2 = cluster_profile.beta_model_derivative(r3d_kpc, n02, rc2, beta2) * unit2*u.Unit('kpc-1')
-                prof_r = prof_r1 + prof_r2
-            else:
-                prof_r1 = cluster_profile.beta_model(r3d_kpc, n01, rc1, beta1)*unit1
-                prof_r2 = cluster_profile.beta_model(r3d_kpc, n02, rc2, beta2)*unit2
-                prof_r = prof_r1 + prof_r2
-            
-        #---------- Otherwise nothing is done
-        else :
-            if not self._silent: print('The requested model has not been implemented.')
-
-        return prof_r
-
     
     #==================================================
     # Compute a Xspec table versus temperature
@@ -329,151 +216,8 @@ class Physics(object):
             dRxspec[:] = np.nan
         
         return dCxspec, dSxspec, dRxspec
-        
 
-    #==================================================
-    # Set a given pressure UPP profile
-    #==================================================
     
-    def set_pressure_gas_gNFW_param(self, pressure_model='P13UPP'):
-        """
-        Set the parameters of the pressure profile:
-        P0, c500 (and r_p given R500), gamma, alpha, beta
-        
-        Parameters
-        ----------
-        - pressure_model (str): available models are 'A10UPP' (Universal Pressure Profile from 
-        Arnaud et al. 2010), 'A10CC' (Cool-Core Profile from Arnaud et al. 2010), 'A10MD' 
-        (Morphologically-Disturbed Profile from Arnaud et al. 2010), or 'P13UPP' (Planck 
-        Intermediate Paper V (2013) Universal Pressure Profile).
-
-        """
-
-        # Arnaud et al. (2010) : Universal Pressure Profile parameters
-        if pressure_model == 'A10UPP':
-            if not self._silent: print('Setting gNFW Arnaud et al. (2010) UPP to compute it from M and z.')
-            pppar = [8.403, 1.177, 0.3081, 1.0510, 5.4905]
-
-        # Arnaud et al. (2010) : Cool-Core clusters parameters
-        elif pressure_model == 'A10CC':
-            if not self._silent: print('Setting gNFW Arnaud et al. (2010) cool-core to compute it from M and z.')
-            pppar = [3.249, 1.128, 0.7736, 1.2223, 5.4905]
-
-        # Arnaud et al. (2010) : Morphologically-Disturbed clusters parameters
-        elif pressure_model == 'A10MD':
-            if not self._silent: print('Setting gNFW Arnaud et al. (2010) morphologically disturbed to compute it from M and z.')
-            pppar = [3.202, 1.083, 0.3798, 1.4063, 5.4905]
-
-        # Planck Intermediate Paper V (2013) : Universal Pressure Profile parameters
-        elif pressure_model == 'P13UPP':
-            if not self._silent: print('Setting gNFW Planck coll. (2013) UPP to compute it from M and z.')
-            pppar = [6.410, 1.810, 0.3100, 1.3300, 4.1300]
-
-        # No other profiles available
-        else:
-            raise ValueError('Pressure profile requested model not available. Use A10UPP, A10CC, A10MD or P13UPP.')
-
-        # Compute the normalization
-        Pnorm = cluster_global.gNFW_normalization(self._redshift, self._M500.to_value('Msun'), cosmo=self._cosmo)
-        
-        # Set the parameters accordingly
-        self._pressure_gas_model = {"name": 'GNFW',
-                                    "P_0" : pppar[0]*Pnorm*u.Unit('keV cm-3'),
-                                    "c500": pppar[1],
-                                    "r_p" : self._R500/pppar[1],
-                                    "a":pppar[3],
-                                    "b":pppar[4],
-                                    "c":pppar[2]}
-
-
-    #==================================================
-    # Set a given pressure isothermal profile
-    #==================================================
-    
-    def set_pressure_gas_isoT_param(self, kBT):
-        """
-        Set the parameters of the pressure profile so that 
-        the cluster is iso thermal
-        
-        Parameters
-        ----------
-        - kBT (quantity): isothermal temperature
-
-        """
-
-        # check type of temperature
-        try:
-            test = kBT.to('keV')
-        except:
-            raise TypeError("The temperature should be a quantity homogeneous to keV.")
-
-        # Get the density parameters
-        Ppar = self._density_gas_model.copy()
-
-        # Modify the parameters depending on the model
-        if self._density_gas_model['name'] == 'GNFW':
-            Ppar['P_0'] = (Ppar['P_0'] * kBT).to('keV cm-3')
-            
-        elif self._density_gas_model['name'] == 'SVM':
-            Ppar['n_0'] = (Ppar['n_0'] * kBT).to('keV cm-3')
-
-        elif self._density_gas_model['name'] == 'beta':
-            Ppar['n_0'] = (Ppar['n_0'] * kBT).to('keV cm-3')
-
-        elif self._density_gas_model['name'] == 'doublebeta':
-            Ppar['n_01'] = (Ppar['n_01'] * kBT).to('keV cm-3')
-            Ppar['n_02'] = (Ppar['n_02'] * kBT).to('keV cm-3')
-
-        else:
-            raise ValueError('Problem with density model list.')
-
-        self._pressure_gas_model = Ppar
-
-
-    #==================================================
-    # Set a given density isothermal profile
-    #==================================================
-    
-    def set_density_gas_isoT_param(self, kBT):
-        """
-        Set the parameters of the density profile so that 
-        the cluster is iso thermal
-        
-        Parameters
-        ----------
-        - kBT (quantity): isothermal temperature
-
-        """
-
-        # check type of temperature
-        try:
-            test = kBT.to('keV')
-        except:
-            raise TypeError("The temperature should be a quantity homogeneous to keV.")
-
-        # Get the density parameters
-        Ppar = self._pressure_gas_model.copy()
-
-        # Modify the parameters depending on the model
-        if self._pressure_gas_model['name'] == 'GNFW':
-            Ppar['P_0'] = (Ppar['P_0'] / kBT).to('cm-3')
-            
-        elif self._pressure_gas_model['name'] == 'SVM':
-            Ppar['n_0'] = (Ppar['n_0'] / kBT).to('cm-3')
-
-        elif self._pressure_gas_model['name'] == 'beta':
-            Ppar['n_0'] = (Ppar['n_0'] / kBT).to('cm-3')
-
-        elif self._pressure_gas_model['name'] == 'doublebeta':
-            Ppar['n_01'] = (Ppar['n_01'] / kBT).to('cm-3')
-            Ppar['n_02'] = (Ppar['n_02'] / kBT).to('cm-3')
-
-        else:
-            raise ValueError('Problem with density model list.')
-
-        self._density_gas_model = Ppar
-
-        
     #==================================================
     # Get the gas electron pressure profile
     #==================================================
@@ -829,7 +573,7 @@ class Physics(object):
         
         #---------- Get the density profile
         rad, p_r = self.get_pressure_gas_profile(radius=press_radius)
-        u_gas = (3.0/2.0)*(mu_e/mu_gas) * p_r # Gas energy density (non-relativistic limit)
+        u_gas = (3.0/2.0)*(mu_e/mu_gas) * p_r # Gas energy density (non-relativistic limit: Uth = 3/2 Pgas = 3/2 mu_e/mu P_e)
         
         #---------- Integrate the pressure in 3d
         Uth_r = np.zeros(len(radius))
@@ -939,7 +683,7 @@ class Physics(object):
 
         """
 
-        Rcut = self._X_cr['Rcut']
+        Rcut = self._X_cr_E['R_norm']
         
         # Get the thermal energy
         rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
@@ -957,7 +701,7 @@ class Physics(object):
                                                          self._Epmin.to_value('GeV'), self._Epmax.to_value('GeV')) * u.GeV**2
         
         # Compute the normalization
-        Norm = self._X_cr['X'] * U_th / Vcr / Ienergy
+        Norm = self._X_cr_E['X'] * U_th / Vcr / Ienergy
 
         return Norm.to('GeV-1 cm-3')
 
@@ -1060,7 +804,7 @@ class Physics(object):
     
     def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
         """
-        Compute the X_cr profile, i.e. the cosmic ray to thermal energy enclosed within R
+        Compute the X_cr_E profile, i.e. the cosmic ray to thermal energy enclosed within R
         profile.
         
         Parameters

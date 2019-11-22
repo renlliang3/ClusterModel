@@ -60,6 +60,9 @@ def profile(radius, angle, prof, filename, label='Profile', R500=None):
     p_unit = prof.unit
     r_unit = radius.unit
     t_unit = angle.unit
+
+    ymin = np.nanmin(prof[prof>0].to_value())*0.5
+    ymax = np.nanmax(prof[prof>0].to_value())*2.0
     
     fig, ax1 = plt.subplots()
     ax1.plot(radius, prof, 'blue')
@@ -71,6 +74,7 @@ def profile(radius, angle, prof, filename, label='Profile', R500=None):
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax1.set_xlim([np.amin(radius.to_value()), np.amax(radius.to_value())])
+    ax1.set_ylim([ymin,ymax])
     ax1.legend()
     
     # Add extra projected radius axis
@@ -281,7 +285,12 @@ class Plots(object):
             rad, prof = self.get_density_gas_profile(radius)
             profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_gas_density.pdf',
                     label='Electron density (cm$^{-3}$)', R500=self._R500)
-            
+
+            # Magfield
+            rad, prof = self.get_magfield_profile(radius)
+            profile(radius, angle, prof.to('uG'), self._output_dir+'/PLOT_PROF_magnetic_field.pdf',
+                    label='B field ($\\mu$G)', R500=self._R500)
+
             # temperature
             rad, prof = self.get_temperature_gas_profile(radius)
             profile(radius, angle, prof.to('keV'), self._output_dir+'/PLOT_PROF_gas_temperature.pdf',

@@ -10,7 +10,6 @@ import pickle
 from astropy.table import Table, Column
 from astropy.io import fits
 
-
 #==================================================
 # Admin class
 #==================================================
@@ -30,11 +29,6 @@ class Admin(object):
     - save_param(self): save the current parameters describing the cluster object.
     - load_param(self, param_file): load a given pre-saved parameter file. The parameter
     file should contain the right parameters to avoid issues latter on.
-
-    - _validate_profile_model_parameters(self, inpar, unit): dedicated to check and validate the parameters 
-    of profile models
-    - _validate_spectrum_model_parameters(self, inpar, unit): dedicated to check and validate the parameters 
-    of spectral models
 
     - save_profile(self, radius=np.logspace(0,4,1000)*u.kpc, prod_list=['all'], NR500max=5.0, 
     Npt_los=100, Energy_density=False, Epmin=None, Epmax=None, Egmin=10.0*u.MeV, Egmax=1.0*u.PeV):
@@ -133,316 +127,6 @@ class Admin(object):
 
         
     #==================================================
-    # Validate profile model parameters
-    #==================================================
-    
-    def _validate_profile_model_parameters(self, inpar, unit):
-        """
-        Check the profile parameters.
-        
-        Parameters
-        ----------
-        - inpar (dict): a dictionary containing the input parameters
-        - unit (str): contain the unit of the profile, e.g. keV/cm-3 for pressure
-        
-        Outputs
-        ----------
-        - outpar (dict): a dictionary with output parameters
-
-        """
-
-        # List of available authorized models
-        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta']
-        
-        # Deal with unit
-        if unit == '' or unit == None:
-            hasunit = False
-        else:
-            hasunit = True
-
-        # Check that the input is a dictionary
-        if type(inpar) != dict :
-            raise TypeError("The model should be a dictionary containing the name key and relevant parameters")
-        
-        # Check that input contains a name
-        if 'name' not in inpar.keys() :
-            raise ValueError("The model dictionary should contain a 'name' field")
-            
-        # Check that the name is in the acceptable name list        
-        if not inpar['name'] in model_list:
-            print('The profile model can be:')
-            print(model_list)
-            raise ValueError("The requested model is not available")
-        
-        #---------- Deal with the case of GNFW
-        if inpar['name'] == 'GNFW':
-            # Check the content of the dictionary
-            cond1 = 'P_0' in inpar.keys() and 'a' in inpar.keys() and 'b' in inpar.keys() and 'c' in inpar.keys()
-            cond2 = 'c500' in inpar.keys() or 'r_p' in inpar.keys()
-            cond3 = not('c500' in inpar.keys() and 'r_p' in inpar.keys())
-
-            if not (cond1 and cond2 and cond3):
-                raise ValueError("The GNFW model should contain: {'P_0','c500' or 'r_p' (not both), 'a', 'b', 'c'}.")
-            
-            # Check units and values
-            if hasunit:
-                try:
-                    test = inpar['P_0'].to(unit)
-                except:
-                    raise TypeError("P_0 should be homogeneous to "+unit)
-
-            if inpar['P_0'] < 0:
-                raise ValueError("P_0 should be >=0")
-
-            if 'r_p' in inpar.keys():
-                try:
-                    test = inpar['r_p'].to('kpc')
-                except:
-                    raise TypeError("r_p should be homogeneous to kpc")
-                
-                if inpar['r_p'] <= 0:
-                    raise ValueError("r_p should be >0")
-
-            if 'c500' in inpar.keys():
-                if inpar['c500'] <=0:
-                    raise ValueError("c500 should be > 0")
-
-            # All good at this stage, setting parameters
-            if 'c500' in inpar.keys():
-                c500 = inpar['c500']
-                r_p = self._R500/inpar['c500']
-            if 'r_p' in inpar.keys():
-                c500 = (self._R500/inpar['r_p']).to_value('')
-                r_p = inpar['r_p']
-            if hasunit:
-                P0 = inpar['P_0'].to(unit)
-            else:
-                P0 = inpar['P_0']*u.adu
-                
-            outpar = {"name": 'GNFW',
-                      "P_0" : P0,
-                      "c500": c500,
-                      "r_p" : r_p.to('kpc'),
-                      "a":inpar['a'],
-                      "b":inpar['b'],
-                      "c":inpar['c']}
-            
-        #---------- Deal with the case of SVM
-        if inpar['name'] == 'SVM':
-            # Check the content of the dictionary
-            cond1 = 'n_0' in inpar.keys() and 'r_c' in inpar.keys() and 'beta' in inpar.keys()
-            cond2 = 'r_s' in inpar.keys() and 'alpha' in inpar.keys() and 'epsilon' in inpar.keys() and 'gamma' in inpar.keys()
-            if not (cond1 and cond2):
-                raise ValueError("The SVM model should contain: {'n_0','beta','r_c','r_s', 'alpha', 'gamma', 'epsilon'}.")
- 
-            # Check units
-            if hasunit:
-                try:
-                    test = inpar['n_0'].to(unit)
-                except:
-                    raise TypeError("n_0 should be homogeneous to "+unit)
-            try:
-                test = inpar['r_c'].to('kpc')
-            except:
-                raise TypeError("r_c should be homogeneous to kpc")
-            try:
-                test = inpar['r_s'].to('kpc')
-            except:
-                raise TypeError("r_s should be homogeneous to kpc")
-            
-            # Check values
-            if inpar['n_0'] < 0:
-                raise ValueError("n_0 should be >= 0")
-            if inpar['r_c'] <= 0:
-                raise ValueError("r_c should be larger than 0")
-            if inpar['r_s'] <= 0:
-                raise ValueError("r_s should be larger than 0")
-
-            if hasunit:
-                n0 = inpar['n_0'].to(unit)
-            else:
-                n0 = inpar['n_0']*u.adu
-            
-            # All good at this stage, setting parameters
-            outpar = {"name"    : 'SVM',
-                      "n_0"    : n0,
-                      "r_c"    : inpar['r_c'].to('kpc'),
-                      "r_s"    : inpar['r_s'].to('kpc'),
-                      "alpha"  : inpar['alpha'],
-                      "beta"   : inpar['beta'],
-                      "gamma"  : inpar['gamma'],
-                      "epsilon": inpar['epsilon']}
-            
-        #---------- Deal with the case of beta
-        if inpar['name'] == 'beta':
-            # Check the content of the dictionary
-            cond1 = 'n_0' in inpar.keys() and 'r_c' in inpar.keys() and 'beta' in inpar.keys()
-            if not cond1:
-                raise ValueError("The beta model should contain: {'n_0','beta','r_c'}.")
-
-            # Check units
-            if hasunit:
-                try:
-                    test = inpar['n_0'].to(unit)
-                except:
-                    raise TypeError("n_0 should be homogeneous to "+unit)
-            try:
-                test = inpar['r_c'].to('kpc')
-            except:
-                raise TypeError("r_c should be homogeneous to kpc")
-
-            # Check values
-            if inpar['n_0'] < 0:
-                raise ValueError("n_0 should be >= 0")
-            if inpar['r_c'] <= 0:
-                raise ValueError("r_c should be larger than 0")                   
-
-            if hasunit:
-                n0 = inpar['n_0'].to(unit)
-            else:
-                n0 = inpar['n_0']*u.adu
-                
-            # All good at this stage, setting parameters
-            outpar = {"name"    : 'beta',
-                      "n_0"    : n0,
-                      "r_c"    : inpar['r_c'].to('kpc'),
-                      "beta"   : inpar['beta']}
-            
-        #---------- Deal with the case of doublebeta
-        if inpar['name'] == 'doublebeta':
-            # Check the content of the dictionary
-            cond1 = 'n_01' in inpar.keys() and 'r_c1' in inpar.keys() and 'beta1' in inpar.keys()
-            cond2 = 'n_02' in inpar.keys() and 'r_c2' in inpar.keys() and 'beta2' in inpar.keys()
-            if not (cond1 and cond2):
-                raise ValueError("The double beta model should contain: {'n_01','beta1','r_c1','n_02','beta2','r_c2'}.")
-
-            # Check units
-            if hasunit:
-                try:
-                    test = inpar['n_01'].to(unit)
-                except:
-                    raise TypeError("n_01 should be homogeneous to "+unit)
-                try:
-                    test = inpar['n_02'].to(unit)
-                except:
-                    raise TypeError("n_02 should be homogeneous to "+unit)
-            try:
-                test = inpar['r_c1'].to('kpc')
-            except:
-                raise TypeError("r_c1 should be homogeneous to kpc")
-            try:
-                test = inpar['r_c2'].to('kpc')
-            except:
-                raise TypeError("r_c2 should be homogeneous to kpc")
-
-            # Check values
-            if inpar['n_01'] < 0:
-                raise ValueError("n_01 should be >= 0")
-            if inpar['r_c1'] <= 0:
-                raise ValueError("r_c1 should be larger than 0")
-            if inpar['n_02'] < 0:
-                raise ValueError("n_02 should be >= 0")
-            if inpar['r_c2'] <= 0:
-                raise ValueError("r_c2 should be larger than 0")
-
-            if hasunit:
-                n01 = inpar['n_01'].to(unit)
-                n02 = inpar['n_02'].to(unit)
-            else:
-                n01 = inpar['n_01']*u.adu
-                n02 = inpar['n_02']*u.adu
-            
-            # All good at this stage, setting parameters
-            outpar = {"name"    : 'doublebeta',
-                      "n_01"    : n01,
-                      "r_c1"    : inpar['r_c1'].to('kpc'),
-                      "beta1"   : inpar['beta1'],
-                      "n_02"    : n02,
-                      "r_c2"    : inpar['r_c2'].to('kpc'),
-                      "beta2"   : inpar['beta2']}
-
-        return outpar
-
-
-    #==================================================
-    # Validate spectrum model parameters
-    #==================================================
-    
-    def _validate_spectrum_model_parameters(self, inpar, unit):
-        """
-        Check the spectrum parameters.
-        
-        Parameters
-        ----------
-        - inpar (dict): a dictionary containing the input parameters
-        - unit (str): contain the unit of the spectrum, e.g. GeV-1 cm-3 for proton
-        
-        Outputs
-        ----------
-        - outpar (dict): a dictionary with output parameters
-
-        """
-
-        # List of available authorized models
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
-        
-        # Deal with unit
-        if unit == '' or unit == None:
-            hasunit = False
-        else:
-            hasunit = True
-
-        # Check that the input is a dictionary
-        if type(inpar) != dict :
-            raise TypeError("The model should be a dictionary containing the name key and relevant parameters")
-        
-        # Check that input contains a name
-        if 'name' not in inpar.keys() :
-            raise ValueError("The model dictionary should contain a 'name' field")
-            
-        # Check that the name is in the acceptable name list        
-        if not inpar['name'] in model_list:
-            print('The spectrum model can be:')
-            print(model_list)
-            raise ValueError("The requested model is not available")
-            
-        #---------- Deal with the case of PowerLaw
-        if inpar['name'] == 'PowerLaw':
-            # Check the content of the dictionary
-            cond1 = 'Index' in inpar.keys()            
-            if not cond1:
-                raise ValueError("The PowerLaw model should contain: {'Index'}.")
-
-            # All good at this stage, setting parameters
-            outpar = {"name" : 'PowerLaw',
-                      "Index": inpar['Index']}
-            
-        #---------- Deal with the case of ExponentialCutoffPowerLaw
-        if inpar['name'] == 'ExponentialCutoffPowerLaw':
-            # Check the content of the dictionary
-            cond1 = 'Index' in inpar.keys() and 'CutoffEnergy' in inpar.keys()
-            if not cond1:
-                raise ValueError("The ExponentialCutoffPowerLaw model should contain: {'Index', 'CutoffEnergy'}.")
-
-            # Check units
-            try:
-                test = inpar['CutoffEnergy'].to('TeV')
-            except:
-                raise TypeError("CutoffEnergy should be homogeneous to TeV")
-            
-            # Check values
-            if inpar['CutoffEnergy'] < 0:
-                raise ValueError("CutoffEnergy should be <= 0")   
-            
-            # All good at this stage, setting parameters
-            outpar = {"name"        : 'ExponentialCutoffPowerLaw',
-                      "Index"       : inpar['Index'],
-                      "CutoffEnergy": inpar['CutoffEnergy'].to('TeV')}
-            
-        return outpar
-
-        
-    #==================================================
     # Save profile
     #==================================================
     
@@ -501,6 +185,13 @@ class Admin(object):
             self._save_txt_file(self._output_dir+'/PROFILE_density_electron.txt',
                                 radius.to_value('kpc'), prof.to_value('cm-3'), 'radius (kpc)', 'density (cm-3)')
 
+        #---------- magfield
+        if 'all' in prod_list or 'B' in prod_list:
+            rad, prof = self.get_magfield_profile(radius)
+            tab['B'] = Column(prof.to_value('uG'), unit='uG', description='Magnetic field')
+            self._save_txt_file(self._output_dir+'/PROFILE_magnetic_field.txt',
+                                radius.to_value('kpc'), prof.to_value('uG'), 'radius (kpc)', 'B field (uG)')
+            
         #---------- temperature
         if 'all' in prod_list or 't_gas' in prod_list:
             rad, prof = self.get_temperature_gas_profile(radius)
@@ -528,7 +219,7 @@ class Admin(object):
             tab['overdensity'] = Column(prof.to_value('adu'), unit='adu', description='Enclosed overdensity wrt critical density')
             self._save_txt_file(self._output_dir+'/PROFILE_overdensity.txt',
                                 radius.to_value('kpc'), prof.to_value('adu'), 'radius (kpc)', 'overdensity')
-
+        
         #---------- Gas mass
         if 'all' in prod_list or 'm_gas' in prod_list:
             rad, prof = self.get_gas_mass_profile(radius)
@@ -814,3 +505,4 @@ class Admin(object):
                               ('{:>'+str(ncar)+'}').format(''),
                               ('{:.'+str(ndec)+'e}').format(col2[il])+'\n'])
         sfile.close()
+
