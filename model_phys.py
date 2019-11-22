@@ -577,7 +577,36 @@ class Physics(object):
 
         return radius, Uth.to('erg')
 
+    
+    #==================================================
+    # Get the gas electron density profile
+    #==================================================
+    
+    def get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+        """
+        Get the magnetic field profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
 
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - B_r (quantity): the magnetic field profile in unit of uG
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+
+        # get profile
+        B_r = self._get_generic_profile(radius, self._magfield_model)
+        B_r[radius > self._R_truncation] *= 0
+        
+        return radius, B_r.to('uG')
+
+    
     #==================================================
     # Get normalized CR density profile
     #==================================================
@@ -759,7 +788,10 @@ class Physics(object):
         - spectrum (quantity): in unit of GeV-1
 
         """
-        
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy)
+
         # define radius
         if Rmax == None:
             Rmax = self._R500
@@ -834,31 +866,3 @@ class Physics(object):
         return radius, x_r*u.adu
 
 
-    #==================================================
-    # Get the gas electron density profile
-    #==================================================
-    
-    def get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
-        """
-        Get the magnetic field profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - B_r (quantity): the magnetic field profile in unit of uG
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        # get profile
-        B_r = self._get_generic_profile(radius, self._magfield_model)
-        B_r[radius > self._R_truncation] *= 0
-        
-        return radius, B_r.to('uG')
-    

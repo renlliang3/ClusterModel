@@ -42,6 +42,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     To do list
     ----------  
+    - Compute 2d quqnatities on a grid
     - Include new Kafexhiu2014 class instead of Naima
     - Include neutrinos
     - Include number density of secondary electrons/positron
