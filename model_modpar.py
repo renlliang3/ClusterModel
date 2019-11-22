@@ -4,6 +4,7 @@ This file deals with 'model parameters' issues regarding the Cluster Class (e.g.
 import astropy.units as u
 from ClusterTools import cluster_global
 from ClusterTools import cluster_profile 
+from ClusterTools import cluster_spectra 
 
 #==================================================
 # Admin class
@@ -292,7 +293,7 @@ class Modpar(object):
         - outpar (dict): a dictionary with output parameters
 
         """
-
+        
         # List of available authorized models
         model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
         
@@ -315,7 +316,7 @@ class Modpar(object):
             print('The spectrum model can be:')
             print(model_list)
             raise ValueError("The requested model is not available")
-            
+
         #---------- Deal with the case of PowerLaw
         if inpar['name'] == 'PowerLaw':
             # Check the content of the dictionary
@@ -326,7 +327,7 @@ class Modpar(object):
             # All good at this stage, setting parameters
             outpar = {"name" : 'PowerLaw',
                       "Index": inpar['Index']}
-            
+
         #---------- Deal with the case of ExponentialCutoffPowerLaw
         if inpar['name'] == 'ExponentialCutoffPowerLaw':
             # Check the content of the dictionary
@@ -348,7 +349,7 @@ class Modpar(object):
             outpar = {"name"        : 'ExponentialCutoffPowerLaw',
                       "Index"       : inpar['Index'],
                       "CutoffEnergy": inpar['CutoffEnergy'].to('TeV')}
-            
+                    
         return outpar
 
         
@@ -799,3 +800,50 @@ class Modpar(object):
             if not self._silent: print('The requested model has not been implemented.')
 
         return prof_r
+
+
+    #==================================================
+    # Get the generic model spectrum
+    #==================================================
+
+    def _get_generic_spectrum(self, energy, model):
+        """
+        Get the generic profile profile.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the energy in units homogeneous to GeV, as a 1d array
+        - model (dict): dictionary containing the model parameters
+        
+        Outputs
+        ----------
+        - energy (quantity): the energy in unit of GeV
+        - S_E (quantity): the spectrum
+
+        """
+
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
+
+        if not model['name'] in model_list:
+            print('The spectral model can :')
+            print(model_list)
+            raise ValueError("The requested model has not been implemented")
+
+        eng_GeV = energy.to_value('GeV')
+
+        #---------- Case of GNFW profile
+        if model['name'] == 'PowerLaw':
+            index   = model["Index"]
+            S_E = cluster_spectra.powerlaw_model(eng_GeV, 1.0, index)
+
+        #---------- Case of SVM model
+        elif model['name'] == 'ExponentialCutoffPowerLaw':
+            index   = model["Index"]
+            Ecut   = model["CutoffEnergy"].to_value('GeV')
+            S_E = cluster_spectra.exponentialcutoffpowerlaw_model(eng_GeV, 1.0, index, Ecut)
+
+        #---------- Otherwise nothing is done
+        else :
+            if not self._silent: print('The requested model has not been implemented.')
+
+        return S_E
