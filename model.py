@@ -42,7 +42,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Compute 2d quqnatities on a grid
+    - Compute 2d quantities on a grid
     - Include new Kafexhiu2014 class instead of Naima
     - Include neutrinos
     - Include number density of secondary electrons/positron
@@ -86,6 +86,8 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
+    - pp_interaction_model (str) : model for particle physics parametrisation of pp 
+    interactions. Available are 'Pythia8', 'SIBYLL', 'QGSJET', 'Geant4'.
 
     - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
     profile. It contains the name of the model and the associated model parameters. 
@@ -186,6 +188,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._nuclear_enhancement = True
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
+        self._pp_interaction_model = 'Pythia8'
 
         # Initialize the profile model (not useful but for clarity of variables)
         self._pressure_gas_model = 1
@@ -330,6 +333,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Getting the maximal proton energy")
         return self._Epmax
 
+    @property
+    def pp_interaction_model(self):
+        if not self._silent: print("Getting the proton-proton interaction model")
+        return self._pp_interaction_model
+    
     @property
     def pressure_gas_model(self):
         if not self._silent: print("Getting the gas electron pressure profile model value")
@@ -761,6 +769,25 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting Epmax value")
 
+    @pp_interaction_model.setter
+    def pp_interaction_model(self, value):
+        # Check type
+        if type(value) != str:
+            raise TypeError("The pp interaction model should be a string")
+
+        # Check value
+        pp_llist = ['Pythia8', 'SIBYLL', 'QGSJET', 'Geant4']
+        if not value in pp_llist:
+            print('pp model available models are:')
+            print(pp_llist)
+            raise ValueError("This pp interaction model is not available")
+        
+        # Setting parameters
+        self._pp_interaction_model = value
+        
+        # Information
+        if not self._silent: print("Setting pp_interaction_model value")
+        
     @pressure_gas_model.setter
     def pressure_gas_model(self, value):
         # check type
