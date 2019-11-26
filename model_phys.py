@@ -22,6 +22,7 @@ from ClusterTools import cluster_global
 from ClusterTools import cluster_profile 
 from ClusterTools import cluster_spectra 
 from ClusterTools import cluster_xspec
+from ClusterTools import cluster_spectra_kafexhiu2014
 
 
 #==================================================
@@ -503,7 +504,7 @@ class Physics(object):
         Mgas_r = mu_e*const.m_p * I_n_gas_r*u.Unit('cm-3 kpc3')
 
         return radius, Mgas_r.to('Msun')
-
+    
     
     #==================================================
     # Compute fgas
@@ -731,7 +732,7 @@ class Physics(object):
 
         Outputs
         ----------
-        - density (quantity): in unit of cm-3
+        - density (quantity): in unit of cm-3 or GeV cm-3
 
         """
 
@@ -750,7 +751,7 @@ class Physics(object):
         # Get the radial form
         rad, f_r = self.get_normed_density_crp_profile(radius)
         
-        # Get the energy enclosed in the spectrum
+        # Integrate over the spectrum
         energy = np.logspace(np.log10(Emin.to_value('GeV')),
                              np.log10(Emax.to_value('GeV')),
                              1000) * u.GeV
@@ -799,7 +800,7 @@ class Physics(object):
         # Get the normalization
         norm = self._get_crp_normalization()
         
-        # Get the spatial form volume
+        # Integrate over the considered volume
         r3d = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
         radius, f_cr_r = self.get_normed_density_crp_profile(r3d)
         Vcr = cluster_profile.get_volume_any_model(radius.to_value('kpc'), f_cr_r.to_value('adu'),
@@ -812,6 +813,47 @@ class Physics(object):
         spectrum = (norm * Vcr * f_E.to_value('adu')).to('GeV-1')
 
         return energy, spectrum.to('GeV-1')
+
+
+    #==================================================
+    # Get the CR proton 2d distribution
+    #==================================================
+    
+    def get_crp_2d(self, energy=np.logspace(-2,7,1000)*u.GeV, radius=np.logspace(0,4,1000)*u.kpc):
+        """
+        Compute the cosmic ray proton 2d distribution.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR protons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - spectrum (quantity): in unit of GeV-1 cm-3
+
+        """
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy)
+        radius = model_tools.check_qarray(radius)
+        
+        # Get the normalization
+        norm = self._get_crp_normalization()
+        
+        # Integrate over the considered volume
+        rad, f_r = self.get_normed_density_crp_profile(radius)
+        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
+
+        # Get the energy form
+        eng, f_E = self.get_normed_crp_spectrum(energy)
+        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
+
+        # compute the spectrum
+        
+        spectrum = norm * f_E2 * f_r2
+
+        return spectrum.to('GeV-1 cm-3')
 
     
     #==================================================
@@ -843,7 +885,7 @@ class Physics(object):
         if Emin == None:
             Emin = self._Epmin
         if Emax == None:
-            Emax = self._Epmax        
+            Emax = self._Epmax
         
         # Thermal energy
         r_uth, Uth_r = self.get_thermal_energy_profile(radius)
@@ -865,4 +907,183 @@ class Physics(object):
 
         return radius, x_r*u.adu
 
+
+
+    
+    #===============================================================================================================================
+    #===============================================================================================================================
+    #===============================================================================================================================
+    #===============================================================================================================================
+    
+    #==================================================
+    # Get the gamma ray production rate
+    #==================================================
+    
+    def get_gamma_ray_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the gamma ray production rate as dN/dEdVdt = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of gamma rays
+
+        Outputs
+        ----------
+        - dNg_dEdVdt (np.ndarray): the differntial production rate
+
+        """
+        
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy)
+        radius = model_tools.check_qarray(radius)
+        
+        # Get the thermal proton density profile
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        rad, n_e  = self.get_density_gas_profile(radius)
+        n_H = n_e * mu_e/mu_p
+
+        # Get the CRp distribution
+        def Jp(rad, eng):
+            return self.get_crp_2d(eng, rad).value
+            
+        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
+                                                                        Y0=self._helium_mass_fraction,
+                                                                        Z0=self._metallicity_sol,
+                                                                        abundance=self._abundance,
+                                                                        hiEmodel=self._pp_interaction_model,
+                                                                        Epmin=self._Epmin,
+                                                                        Epmax=self._Epmax,
+                                                                        NptEpPd=100)
+        
+        # Extract the spectrum
+        dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H)
+        dN_dEdVdt = model.electron_spectrum(energy, radius, n_H)
+        dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu')
+        dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='nue')
+
+        return dN_dEdVdt.to('GeV-1 cm-3 s-1')
+
+
+    #==================================================
+    # Get the electron production rate
+    #==================================================
+    
+    def get_electron_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the electron production rate as dN/dEdVdt = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of electrons
+
+        Outputs
+        ----------
+        - dNg_dEdVdt (np.ndarray): the differntial production rate
+
+        """
+
+        
+
+
+        return dN_dEdVdt.to('GeV-1 cm-3 s-1')
+
+    #==================================================
+    # Get the electron production rate
+    #==================================================
+    
+    def get_neutrinos_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the neutrinos production rate as dN/dEdVdt = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of electrons
+
+        Outputs
+        ----------
+        - dNg_dEdVdt (np.ndarray): the differntial production rate
+
+        """
+
+
+        return dN_dEdVdt.to('GeV-1 cm-3 s-1')
+
+
+    #==================================================
+    # Get the electron spectrum
+    #==================================================
+    
+    def get_spectrum_electron(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the electron spectrum as dN/dEdV = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of electrons
+
+        Outputs
+        ----------
+        - dNg_dEdV (np.ndarray): the differntial production rate
+
+        """
+
+        model = cluster_electron_loss.model(
+
+        )
+
+        dN_dEdVdt = model.electron_spectrum(energy)
+        
+
+        return dN_dEdV.to('GeV-1 cm-3')
+
+    
+    #==================================================
+    # Get the synchrotron spectrum
+    #==================================================
+    
+    def get_synchrotron_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the synchrotron density as dN/dEdV = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of electrons
+
+        Outputs
+        ----------
+        - dNs_dEdV (np.ndarray): the differntial production rate
+
+        """
+
+
+        return dN_dfdV.to('W  cm-3')
+
+
+    #==================================================
+    # Get the IC spectrum
+    #==================================================
+    
+    def get_IC_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+        """
+        Compute the inverse compton density as dN/dEdV = f(E, r)
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of electrons
+
+        Outputs
+        ----------
+        - dNic_dEdV (np.ndarray): the differntial production rate
+
+        """
+
+
+        return dN_dfdV.to('W  cm-3')
 
