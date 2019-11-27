@@ -79,6 +79,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
     - EBL_model (str): the EBL model to use for gamma rays
 
+    - Rmin (quantity): the minimum radius used to define integration arrays
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
     - X_cr_E (dict): the cosmic ray to thermal energy and the radius used for normalization
     - nuclear_enhancement (bool): compute the pion model with/without nuclear enhancement 
@@ -97,6 +98,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - magfield_model (dict): the definition of the magnetic field profile.
     - spectrum_crp_model (dict): the definition of the cosmic ray proton energy shape
 
+    - Npt_per_decade_integ (int): the number of point per decade used in integrations
     - map_coord (SkyCoord object): the map center coordinates.
     - map_reso (quantity): the map pixel size, homogeneous to degrees.
     - map_fov (list of quantity):  the map field of view as [FoV_x, FoV_y], homogeneous to deg.
@@ -183,6 +185,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._EBL_model = 'dominguez'
         
         #---------- Physical properties
+        self._Rmin = 1.0*u.kpc
         self._hse_bias = 0.2
         self._X_cr_E = {'X':0.01, 'R_norm':self._R500}
         self._nuclear_enhancement = True
@@ -207,6 +210,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                                     'Index'      : 2.5}
         
         #---------- Sampling
+        self._Npt_per_decade_integ = 100
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
         self._map_reso   = 0.02*u.deg
         self._map_fov    = [5.0, 5.0]*u.deg
@@ -309,6 +313,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     #========== ICM physics
     @property
+    def Rmin(self):
+        if not self._silent: print("Getting Rmin value")
+        return self._Rmin
+    
+    @property
     def hse_bias(self):
         if not self._silent: print("Getting hydrostatic mass bias value")
         return self._hse_bias
@@ -364,6 +373,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         return self._spectrum_crp_model
     
     #========== Maps parameters
+    @property
+    def Npt_per_decade_integ(self):
+        if not self._silent: print("Getting the number of point per decade used in integration")
+        return self._Npt_per_decade_integ
+
     @property
     def map_coord(self):
         if not self._silent: print("Getting the map coord value")
@@ -609,7 +623,21 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Setting theta_truncation value")
         if not self._silent: print("Setting: R_truncation ; Fixing: D_ang")
         
-    #========== ICM composition    
+    #========== ICM composition
+    @Rmin.setter
+    def Rmin(self, value):
+        # Check type
+        try:
+            test = value.to('kpc')
+        except:
+            raise TypeError("The radius Rmin should be a quantity homogeneous to kpc.")
+
+        # Set parameters
+        self._Rmin = value
+        
+        # Information
+        if not self._silent: print("Setting Rmin value")
+    
     @helium_mass_fraction.setter
     def helium_mass_fraction(self, value):
         # Check type
@@ -858,7 +886,23 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting spectrum_crp_model value")
 
-    #========== Maps
+    #========== Sampling
+    @Npt_per_decade_integ.setter
+    def Npt_per_decade_integ(self, value):
+        # Check type
+        if type(value) != int:
+            raise TypeError("The number of point per decade for integration should be a int")
+
+        # Check value
+        if value < 1:
+            raise ValueError("The number of point per decade should be >= 1")
+
+        # Set parameters
+        self._Npt_per_decade_integ = value
+        
+        # Information
+        if not self._silent: print("Setting number of point per decade (for integration) value")
+        
     @map_coord.setter
     def map_coord(self, value):
         err_msg = ("The coordinates can be a coord object, "
