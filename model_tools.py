@@ -9,7 +9,7 @@ import numpy as np
 # Check radius
 #==================================================
 
-def check_qarray(qarr):
+def check_qarray(qarr, unit=None):
     """
     Make sure quantity array are arrays
 
@@ -23,8 +23,18 @@ def check_qarray(qarr):
 
     """
 
-    if type(qarr.to_value()) == float:
-        qarr = np.array([qarr.to_value()]) * qarr.unit
+    if unit is None:
+        if type(qarr) == float:
+            qarr = np.array([qarr])
+            
+    else:
+        try:
+            test = qarr.to(unit)
+        except:
+            raise TypeError("Unvalid unit for qarr")
+
+        if type(qarr.to_value()) == float:
+            qarr = np.array([qarr.to_value()]) * qarr.unit
 
     return qarr
 
@@ -61,7 +71,7 @@ def replicate_array(x, N, T=False):
 # Def array based on point per decade, min and max
 #==================================================
 
-def sampling_array(xmin, xmax, NptPd=10):
+def sampling_array(xmin, xmax, NptPd=10, unit=False):
     """
     Make an array with a given number of point per decade
     from xmin to xmax
@@ -78,15 +88,21 @@ def sampling_array(xmin, xmax, NptPd=10):
 
     """
 
-    array = np.logspace(np.log10(xmin), np.log10(xmax), int(NptPd*(np.log10(xmax/xmin))))
-    
+    if unit:
+        my_unit = xmin.unit
+        array = np.logspace(np.log10(xmin.to_value(my_unit)),
+                            np.log10(xmax.to_value(my_unit)),
+                            int(NptPd*(np.log10(xmax.to_value(my_unit)/xmin.to_value(my_unit)))))*my_unit
+    else:
+        array = np.logspace(np.log10(xmin), np.log10(xmax), int(NptPd*(np.log10(xmax/xmin))))
+
     return array
 
 #==================================================
 # Integration loglog space with trapezoidale rule
 #==================================================
 
-def trapz_loglog(self, y, x, axis=-1, intervals=False):
+def trapz_loglog(y, x, axis=-1, intervals=False):
     """
     Integrate along the given axis using the composite trapezoidal rule in
     loglog space. Integrate y(x) along given axis in loglog space. y can be a function 
@@ -166,55 +182,4 @@ def trapz_loglog(self, y, x, axis=-1, intervals=False):
     ret = np.add.reduce(trapzs, axis) * x_unit * y_unit
     
     return ret
-
-
-
-#==================================================
-# Volume integral
-#==================================================
-
-def volume_integral(profile, radius):
-    """
-    Compute the volume integrale of any profile:
-    I = \int_r1^r2 4pi r^2 p(r) dr
-
-    Parameters
-    ----------
-    - profile (quantity): array
-    - radius (quantity): array
-
-    Outputs
-    ----------
-    - integral (quantity): value
-
-    """
-
-    
-    return 
-
-
-
-
-
-#==================================================
-# Line-of-sight integral
-#==================================================
-
-def los_integral():
-    """
-    Make a two dimension grid based on two 1 dimension arrays,
-    such as energy and radius.
-
-    Parameters
-    ----------
-    - x1 (quantity): array one
-    - x1 (quantity): array two    
-
-    Outputs
-    ----------
-    - grid (quantity): 2d quantity array
-
-    """
-
-    return 
 
