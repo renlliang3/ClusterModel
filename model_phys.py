@@ -24,6 +24,8 @@ from ClusterTools import cluster_spectra
 from ClusterTools import cluster_xspec
 from ClusterTools import cluster_spectra_kafexhiu2014
 
+import naima
+    
 
 #==================================================
 # Physics class
@@ -224,7 +226,7 @@ class Physics(object):
     # Get the gas electron pressure profile
     #==================================================
 
-    def get_pressure_gas_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_pressure_gas_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the thermal electron pressure profile.
         
@@ -240,7 +242,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # get profile
         p_r = self._get_generic_profile(radius, self._pressure_gas_model)
@@ -253,7 +255,7 @@ class Physics(object):
     # Get the gas electron density profile
     #==================================================
     
-    def get_density_gas_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_density_gas_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the thermal electron density profile.
         
@@ -269,7 +271,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # get profile
         n_r = self._get_generic_profile(radius, self._density_gas_model)
@@ -282,7 +284,7 @@ class Physics(object):
     # Get the gas electron temperature profile
     #==================================================
     
-    def get_temperature_gas_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_temperature_gas_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the thermal temperature profile.
         
@@ -298,7 +300,7 @@ class Physics(object):
         """
         
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Compute n and P
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -318,7 +320,7 @@ class Physics(object):
     # Get the gas entropy profile
     #==================================================
     
-    def get_entropy_gas_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_entropy_gas_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the entropy profile.
         
@@ -334,7 +336,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Compute n and P
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -354,7 +356,7 @@ class Physics(object):
     # Get the hydrostatic mass profile
     #==================================================
 
-    def get_hse_mass_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_hse_mass_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the hydrostatic mass profile using exact analytical expressions.
         
@@ -370,7 +372,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
@@ -396,7 +398,7 @@ class Physics(object):
     # Get the overdensity contrast profile
     #==================================================
 
-    def get_overdensity_contrast_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_overdensity_contrast_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the overdensity contrast profile.
         
@@ -412,7 +414,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Compute delta from the mass profile
         r, mhse = self.get_hse_mass_profile(radius)       
@@ -466,8 +468,7 @@ class Physics(object):
     #==================================================
     # Compute Mgas
     #==================================================
-    
-    def get_gas_mass_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_gas_mass_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the gas mass profile.
         
@@ -483,34 +484,30 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
                                                                             Z=self._metallicity_sol*self._abundance)
         
-        #---------- Define radius associated to the density
-        dens_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the density profile
-        rad, n_r = self.get_density_gas_profile(radius=dens_radius)
-
         #---------- Integrate the mass
         I_n_gas_r = np.zeros(len(radius))
         for i in range(len(radius)):
-            I_n_gas_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), n_r.to_value('cm-3'),
-                                                                radius.to_value('kpc')[i], Npt=1000)
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            rad, n_r = self.get_density_gas_profile(radius=rad)
+            I_n_gas_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2*n_r, rad)
         
-        Mgas_r = mu_e*const.m_p * I_n_gas_r*u.Unit('cm-3 kpc3')
+        Mgas_r = mu_e*const.m_p * I_n_gas_r
 
         return radius, Mgas_r.to('Msun')
-    
+
     
     #==================================================
     # Compute fgas
     #==================================================
 
-    def get_fgas_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_fgas_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the gas fraction profile.
         
@@ -526,7 +523,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Compute fgas from Mgas and Mhse
         r, mgas = self.get_gas_mass_profile(radius)
@@ -539,8 +536,8 @@ class Physics(object):
     #==================================================
     # Compute thermal energy
     #==================================================
-    
-    def get_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+
+    def get_thermal_energy_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the thermal energy profile
         
@@ -555,35 +552,28 @@ class Physics(object):
         """
         
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
                                                                             Z=self._metallicity_sol*self._abundance)
 
-        #---------- Define radius associated to the pressure
-        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the density profile
-        rad, p_r = self.get_pressure_gas_profile(radius=press_radius)
-        u_gas = (3.0/2.0)*(mu_e/mu_gas) * p_r # Gas energy density (non-relativistic limit: Uth = 3/2 Pgas = 3/2 mu_e/mu P_e)
-        
         #---------- Integrate the pressure in 3d
-        Uth_r = np.zeros(len(radius))
+        Uth_r = np.zeros(len(radius))*u.erg
         for i in range(len(radius)):
-            Uth_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), u_gas.to_value('keV cm-3'),
-                                                            radius.to_value('kpc')[i], Npt=1000)
-        
-        Uth = Uth_r*u.Unit('keV cm-3 kpc3')
-
-        return radius, Uth.to('erg')
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            rad, p_r = self.get_pressure_gas_profile(radius=rad)
+            Uth_r[i] = model_tools.trapz_loglog((3.0/2.0)*(mu_e/mu_gas) * 4*np.pi*rad**2 * p_r, rad)
+                    
+        return radius, Uth_r.to('erg')
 
     
     #==================================================
     # Get the gas electron density profile
     #==================================================
     
-    def get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_magfield_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the magnetic field profile.
         
@@ -599,7 +589,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # get profile
         B_r = self._get_generic_profile(radius, self._magfield_model)
@@ -612,7 +602,7 @@ class Physics(object):
     # Get normalized CR density profile
     #==================================================
     
-    def get_normed_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_normed_density_crp_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the normalized cosmic ray proton density profile.
         
@@ -628,7 +618,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         # get profile
         n_r = self._get_generic_profile(radius, self._density_crp_model)
@@ -641,7 +631,7 @@ class Physics(object):
     # Get normalized CR density profile
     #==================================================
     
-    def get_normed_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_normed_crp_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV):
         """
         Get the normalized cosmic ray proton spectrum.
         
@@ -657,7 +647,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        energy = model_tools.check_qarray(energy)
+        energy = model_tools.check_qarray(energy, unit='GeV')
 
         # get spectrum
         S_E = self._get_generic_spectrum(energy, self._spectrum_crp_model)
@@ -670,7 +660,7 @@ class Physics(object):
     #==================================================
     # Get the CR proton normalization
     #==================================================
-    
+
     def _get_crp_normalization(self):
         """
         Compute the normalization of the cosmic ray proton distribution:
@@ -692,31 +682,26 @@ class Physics(object):
         # Get the thermal energy
         rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
         
-        # Get the spatial form volume
-        r3d = cluster_profile.define_safe_radius_array(np.array([Rcut.to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius, f_cr_r = self.get_normed_density_crp_profile(r3d)
-        Vcr = cluster_profile.get_volume_any_model(radius.to_value('kpc'), f_cr_r.to_value('adu'),
-                                                   Rcut.to_value('kpc')) * u.Unit('kpc3')
+        # Get the spatial form volume for CRp
+        rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
+        rad, f_cr_r = self.get_normed_density_crp_profile(rad)
+        Vcr = model_tools.trapz_loglog(4*np.pi*rad**2 * f_cr_r.to_value('adu'), rad)
         
         # Get the energy enclosed in the spectrum
-        energy = np.logspace(np.log10(self._Epmin.to_value('GeV')),
-                             np.log10(self._Epmax.to_value('GeV')),
-                             1000) * u.GeV
-        eng, spectrum = self.get_normed_crp_spectrum(energy)
-        Ienergy = cluster_spectra.get_integral_any_model(eng.to_value('GeV'), eng.to_value('GeV')*spectrum.to_value('adu'),
-                                                         self._Epmin.to_value('GeV'), self._Epmax.to_value('GeV')) * u.GeV**2
+        eng = model_tools.sampling_array(self._Epmin, self._Epmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        eng, f_cr_E = self.get_normed_crp_spectrum(eng)
+        Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
         
         # Compute the normalization
         Norm = self._X_cr_E['X'] * U_th / Vcr / Ienergy
 
         return Norm.to('GeV-1 cm-3')
-
     
     #==================================================
     # Get the CR proton density profile
     #==================================================
     
-    def get_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc,
+    def get_density_crp_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                                 Emin=None, Emax=None, Energy_density=False):
         """
         Compute the cosmic ray proton density profile, integrating energies 
@@ -737,12 +722,12 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Define energy
-        if Emin == None:
+        if Emin is None:
             Emin = self._Epmin
-        if Emax == None:
+        if Emax is None:
             Emax = self._Epmax        
             
         # Get the normalization
@@ -752,28 +737,24 @@ class Physics(object):
         rad, f_r = self.get_normed_density_crp_profile(radius)
         
         # Integrate over the spectrum
-        energy = np.logspace(np.log10(Emin.to_value('GeV')),
-                             np.log10(Emax.to_value('GeV')),
-                             1000) * u.GeV
-        eng, spectrum = self.get_normed_crp_spectrum(energy)
-
+        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        eng, f_cr_E = self.get_normed_crp_spectrum(eng)
+        
         if Energy_density:
-            Ienergy = cluster_spectra.get_integral_any_model(eng.to_value('GeV'), eng.to_value('GeV')*spectrum.to_value('adu'),
-                                                             Emin.to_value('GeV'), Emax.to_value('GeV')) * u.GeV**2
-            density = (norm * f_r.to_value('adu') * Ienergy).to('GeV cm-3')            
+            Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
+            density = (norm * f_r.to_value('adu') * Ienergy).to('GeV cm-3')
         else:
-            Ienergy = cluster_spectra.get_integral_any_model(eng.to_value('GeV'), spectrum.to_value('adu'),
-                                                             Emin.to_value('GeV'), Emax.to_value('GeV')) * u.GeV
+            Ienergy = model_tools.trapz_loglog(f_cr_E.to_value('adu'), eng)
             density = (norm * f_r.to_value('adu') * Ienergy).to('cm-3')            
             
         return radius, density
 
-    
+
     #==================================================
     # Get the CR proton spectrum
     #==================================================
     
-    def get_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV, Rmax=None):
+    def get_crp_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None):
         """
         Compute the cosmic ray proton spectrum, integrating radius 
         between 0 and Rmax.
@@ -791,26 +772,26 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        energy = model_tools.check_qarray(energy)
+        energy = model_tools.check_qarray(energy, unit='GeV')
 
         # define radius
-        if Rmax == None:
+        if Rmax is None:
             Rmax = self._R500
         
         # Get the normalization
         norm = self._get_crp_normalization()
         
         # Integrate over the considered volume
-        r3d = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius, f_cr_r = self.get_normed_density_crp_profile(r3d)
-        Vcr = cluster_profile.get_volume_any_model(radius.to_value('kpc'), f_cr_r.to_value('adu'),
-                                                   Rmax.to_value('kpc')) * u.Unit('kpc3')
+        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
+        rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        rad, f_cr_r = self.get_normed_density_crp_profile(rad)
+        Vcr = model_tools.trapz_loglog(4*np.pi*rad**2 * f_cr_r.to_value('adu'), rad)
 
         # Get the energy form
         eng, f_E = self.get_normed_crp_spectrum(energy)
         
         # compute the spectrum
-        spectrum = (norm * Vcr * f_E.to_value('adu')).to('GeV-1')
+        spectrum = norm * Vcr * f_E.to_value('adu')
 
         return energy, spectrum.to('GeV-1')
 
@@ -819,7 +800,7 @@ class Physics(object):
     # Get the CR proton 2d distribution
     #==================================================
     
-    def get_crp_2d(self, energy=np.logspace(-2,7,1000)*u.GeV, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_crp_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the cosmic ray proton 2d distribution.
         
@@ -830,13 +811,13 @@ class Physics(object):
 
         Outputs
         ----------
-        - spectrum (quantity): in unit of GeV-1 cm-3
+        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
 
         """
 
         # In case the input is not an array
-        energy = model_tools.check_qarray(energy)
-        radius = model_tools.check_qarray(radius)
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Get the normalization
         norm = self._get_crp_normalization()
@@ -850,7 +831,6 @@ class Physics(object):
         f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
 
         # compute the spectrum
-        
         spectrum = norm * f_E2 * f_r2
 
         return spectrum.to('GeV-1 cm-3')
@@ -860,8 +840,8 @@ class Physics(object):
     # Get the CR to thermal energy profile
     #==================================================
     
-    def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc,
-                                          Emin=None, Emax=None):
+    def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                           Emin=None, Emax=None):
         """
         Compute the X_cr_E profile, i.e. the cosmic ray to thermal energy enclosed within R
         profile.
@@ -879,64 +859,53 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Define energy
-        if Emin == None:
+        if Emin is None:
             Emin = self._Epmin
-        if Emax == None:
+        if Emax is None:
             Emax = self._Epmax
         
         # Thermal energy
         r_uth, Uth_r = self.get_thermal_energy_profile(radius)
 
-        # CR energy density profile
-        r3d = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0)*u.kpc
-        r_cr, e_cr = self.get_density_crp_profile(r3d, Emin=Emin, Emax=Emax, Energy_density=True)
-
         # Integrate CR energy density profile
-        Ucr_r = np.zeros(len(radius))
+        Ucr_r = np.zeros(len(radius))*u.GeV
         for i in range(len(radius)):
-            Ucr_r[i] = cluster_profile.get_volume_any_model(r_cr.to_value('kpc'), e_cr.to_value('GeV cm-3'),
-                                                            radius.to_value('kpc')[i], Npt=1000)
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            rad, e_cr = self.get_density_crp_profile(rad, Emin=Emin, Emax=Emax, Energy_density=True)
+            Ucr_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2 * e_cr, rad)
 
-        U_cr = Ucr_r * u.Unit('GeV cm-3 kpc3')
-        
         # X(<R)
-        x_r = U_cr.to_value('GeV') / Uth_r.to_value('GeV')
+        x_r = Ucr_r.to_value('GeV') / Uth_r.to_value('GeV')
 
         return radius, x_r*u.adu
 
 
-
-    
-    #===============================================================================================================================
-    #===============================================================================================================================
-    #===============================================================================================================================
-    #===============================================================================================================================
-    
     #==================================================
     # Get the gamma ray production rate
     #==================================================
     
-    def get_gamma_ray_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_rate_gamma_ray(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the gamma ray production rate as dN/dEdVdt = f(E, r)
         
         Parameters
         ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
         - energy (quantity) : the physical energy of gamma rays
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
 
         Outputs
         ----------
-        - dNg_dEdVdt (np.ndarray): the differntial production rate
+        - dN_dEdVdt (np.ndarray): the differntial production rate
 
         """
         
         # In case the input is not an array
-        energy = model_tools.check_qarray(energy)
-        radius = model_tools.check_qarray(radius)
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Get the thermal proton density profile
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
@@ -944,10 +913,10 @@ class Physics(object):
         rad, n_e  = self.get_density_gas_profile(radius)
         n_H = n_e * mu_e/mu_p
 
-        # Get the CRp distribution
-        def Jp(rad, eng):
-            return self.get_crp_2d(eng, rad).value
-            
+        # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
+        def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
+
+        # Define the model
         model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
                                                                         Y0=self._helium_mass_fraction,
                                                                         Z0=self._metallicity_sol,
@@ -955,69 +924,140 @@ class Physics(object):
                                                                         hiEmodel=self._pp_interaction_model,
                                                                         Epmin=self._Epmin,
                                                                         Epmax=self._Epmax,
-                                                                        NptEpPd=100)
+                                                                        NptEpPd=self._Npt_per_decade_integ)
         
         # Extract the spectrum
-        dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H)
-        dN_dEdVdt = model.electron_spectrum(energy, radius, n_H)
-        dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu')
-        dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='nue')
+        dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H).T
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
 
     #==================================================
-    # Get the electron production rate
+    # Get the gamma ray production rate
     #==================================================
     
-    def get_electron_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_rate_cre(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
-        Compute the electron production rate as dN/dEdVdt = f(E, r)
+        Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
         Parameters
         ----------
+        - energy (quantity) : the physical energy of gamma rays
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - energy (quantity) : the physical energy of electrons
 
         Outputs
         ----------
-        - dNg_dEdVdt (np.ndarray): the differntial production rate
+        - dN_dEdVdt (np.ndarray): the differntial production rate
 
         """
-
         
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Get the thermal proton density profile
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        rad, n_e  = self.get_density_gas_profile(radius)
+        n_H = n_e * mu_e/mu_p
 
+        # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
+        def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
+
+        # Define the model
+        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
+                                                                        Y0=self._helium_mass_fraction,
+                                                                        Z0=self._metallicity_sol,
+                                                                        abundance=self._abundance,
+                                                                        hiEmodel=self._pp_interaction_model,
+                                                                        Epmin=self._Epmin,
+                                                                        Epmax=self._Epmax,
+                                                                        NptEpPd=self._Npt_per_decade_integ)
+        
+        # Extract the spectrum
+        dN_dEdVdt = model.electron_spectrum(energy, radius, n_H).T
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
+
     #==================================================
-    # Get the electron production rate
+    # Get the gamma ray production rate
     #==================================================
     
-    def get_neutrinos_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc, flavor='all'):
         """
-        Compute the neutrinos production rate as dN/dEdVdt = f(E, r)
+        Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
         Parameters
         ----------
+        - energy (quantity) : the physical energy of gamma rays
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - energy (quantity) : the physical energy of electrons
+        - flavor (str): either 'all', 'numu' or 'nue'
 
         Outputs
         ----------
-        - dNg_dEdVdt (np.ndarray): the differntial production rate
+        - dN_dEdVdt (np.ndarray): the differntial production rate
 
         """
+        
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Get the thermal proton density profile
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        rad, n_e  = self.get_density_gas_profile(radius)
+        n_H = n_e * mu_e/mu_p
+
+        # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
+        def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
+
+        # Define the model
+        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
+                                                                        Y0=self._helium_mass_fraction,
+                                                                        Z0=self._metallicity_sol,
+                                                                        abundance=self._abundance,
+                                                                        hiEmodel=self._pp_interaction_model,
+                                                                        Epmin=self._Epmin,
+                                                                        Epmax=self._Epmax,
+                                                                        NptEpPd=self._Npt_per_decade_integ)
+        
+        # Extract the spectrum
+        if flavor == 'all':
+            dN_dEdVdt1 = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
+            dN_dEdVdt2 = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
+            dN_dEdVdt = dN_dEdVdt1 + dN_dEdVdt2
+            
+        elif flavor == 'munu':
+            dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
+            
+        elif flavor == 'nue':
+            dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
+            
+        else :
+            raise ValueError('Only all, numu and nue flavor are available.')    
 
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
 
+
+
+    
+    #===============================================================================================================================
+    #===============================================================================================================================
+    #===============================================================================================================================
+    #===============================================================================================================================
+    
+
+    
+    
     #==================================================
     # Get the electron spectrum
     #==================================================
     
-    def get_spectrum_electron(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_spectrum_cre(self, radius=np.logspace(0,4,100)*u.kpc, energy=np.logspace(-2,7,100)*u.GeV):
         """
         Compute the electron spectrum as dN/dEdV = f(E, r)
         
@@ -1032,9 +1072,7 @@ class Physics(object):
 
         """
 
-        model = cluster_electron_loss.model(
-
-        )
+        model = cluster_electron_loss.model()
 
         dN_dEdVdt = model.electron_spectrum(energy)
         
@@ -1046,7 +1084,7 @@ class Physics(object):
     # Get the synchrotron spectrum
     #==================================================
     
-    def get_synchrotron_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_synchrotron_rate(self, radius=np.logspace(0,4,100)*u.kpc, energy=np.logspace(-2,7,100)*u.GeV):
         """
         Compute the synchrotron density as dN/dEdV = f(E, r)
         
@@ -1069,7 +1107,7 @@ class Physics(object):
     # Get the IC spectrum
     #==================================================
     
-    def get_IC_rate(self, radius=np.logspace(0,4,1000)*u.kpc, energy=np.logspace(-2,7,1000)*u.GeV):
+    def get_IC_rate(self, radius=np.logspace(0,4,100)*u.kpc, energy=np.logspace(-2,7,100)*u.GeV):
         """
         Compute the inverse compton density as dN/dEdV = f(E, r)
         
@@ -1086,4 +1124,77 @@ class Physics(object):
 
 
         return dN_dfdV.to('W  cm-3')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ##Test function for volume integration
+    def testfunc(self, energy=np.logspace(-2,6,100)*u.GeV):
+
+        radius = np.logspace(0, np.log10(self._R500.to_value('kpc')),100)*u.kpc
+        
+        dN_dEdVdt = self.get_rate_gamma_ray(energy, radius)
+        dN_dEdt = model_tools.trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
+
+    def testfunc2(self, energy=np.logspace(-2,6,100)*u.GeV, Rmax=None,
+                  type_integral='spherical', NR500max=5.0, Npt_los=100):
+        if Rmax == None:
+            Rmax = self._R500
+            
+        if self._spectrum_crp_model['name'] == 'PowerLaw':
+            CRp = naima.models.PowerLaw(1.0/u.GeV, 1.0*u.GeV, self._spectrum_crp_model['Index'])
+        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
+            CRp = naima.models.ExponentialCutoffPowerLaw(1.0/u.GeV, 1.0*u.GeV,
+                                                         self._spectrum_crp_model['Index'], self._spectrum_crp_model['PivotEnergy'])
+        else:
+            raise ValueError("The available spectra are PowerLaw and ExponentialCutoffPowerLaw for now")
+
+        # Get the pion decay model for 1 GeV-1 CRp in the volume and for 1 cm-3 of thermal gas
+        gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
+
+        # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
+        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
+        gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
+
+        # Compute the normalization volume and the integration cross density volume
+        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
+        radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
+        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
+                                                          self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
+
+        # Compute the integral spherical volume
+        r3d2 = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
+        radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        n_gas_r2 *= mu_e/mu_p
+        radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
+        
+        V_ncr_ngas = cluster_profile.get_volume_any_model(radius2.to_value('kpc'),
+                                                          n_gas_r2.to_value('cm-3')*f_crp_r2.to_value('adu'),
+                                                          Rmax.to_value('kpc'))*u.kpc**3
+        
+        # Compute the spectrum, within Rcut, assuming 1cm-3 gas, normalize by the energy computation volume and multiply by volume term
+        dN_dEdSdt = (V_ncr_ngas/V_CRenergy).to_value('')*gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
+        
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
 
