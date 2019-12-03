@@ -772,55 +772,6 @@ class Physics(object):
         if Emax is None:
             Emax = self._Epmax        
             
-        # Get the normalization
-        norm = self._get_crp_normalization()
-        
-        # Get the radial form
-        rad, f_r = self.get_normed_density_crp_profile(radius)
-        
-        # Integrate over the spectrum
-        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        eng, f_cr_E = self.get_normed_crp_spectrum(eng)
-        
-        if Energy_density:
-            Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
-            density = (norm * f_r.to_value('adu') * Ienergy).to('GeV cm-3')
-        else:
-            Ienergy = model_tools.trapz_loglog(f_cr_E.to_value('adu'), eng)
-            density = (norm * f_r.to_value('adu') * Ienergy).to('cm-3')            
-            
-        return radius, density
-
-
-    def get_density_crp_profile2(self, radius=np.logspace(0,4,100)*u.kpc,
-                                Emin=None, Emax=None, Energy_density=False):
-        """
-        Compute the cosmic ray proton density profile, integrating energies 
-        between Emin and Emax.
-        
-        Parameters
-        ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - Emin (quantity): the lower bound for energy integration
-        - Emax (quantity): the upper bound for energy integration
-        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
-        the number density is computed.
-
-        Outputs
-        ----------
-        - density (quantity): in unit of cm-3 or GeV cm-3
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius, unit='kpc')
-
-        # Define energy
-        if Emin is None:
-            Emin = self._Epmin
-        if Emax is None:
-            Emax = self._Epmax        
-            
         # Integrate over the spectrum
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
         dN_dEdV = self.get_crp_2d(eng, radius)
@@ -833,12 +784,6 @@ class Physics(object):
         return radius, profile
 
 
-
-
-
-
-
-    
     #==================================================
     # Get the CR proton spectrum
     #==================================================
