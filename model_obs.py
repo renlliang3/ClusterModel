@@ -920,3 +920,89 @@ class Observables(object):
         
         return sxmap
 
+
+
+
+
+
+    
+    #====================================================================================================
+    #====================================================================================================
+    #====================================================================================================
+    #====================================================================================================
+    #====================================================================================================
+    #====================================================================================================
+
+
+
+
+
+
+
+
+    ##Test function for volume integration
+    def testfuncsync(self, frequency=np.logspace(-2,2,100)*u.GHz):
+
+        radius = np.logspace(0, np.log10(self._R500.to_value('kpc')),100)*u.kpc
+        
+        dN_dEdVdt = self.get_synchrotron_rate(frequency, radius)
+        dN_dEdt = model_tools.trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
+        dN_dEdSdt = (dN_dEdt / (4*np.pi * self._D_lum**2) * (const.h*frequency)**2 / frequency).to('Jy')
+        return frequency, dN_dEdSdt
+
+
+    
+    def testfunc(self, energy=np.logspace(-2,6,100)*u.GeV):
+
+        radius = np.logspace(0, np.log10(self._R500.to_value('kpc')),100)*u.kpc
+        
+        dN_dEdVdt = self.get_rate_gamma_ray(energy, radius)
+        dN_dEdt = model_tools.trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
+
+    def testfunc2(self, energy=np.logspace(-2,6,100)*u.GeV, Rmax=None,
+                  type_integral='spherical', NR500max=5.0, Npt_los=100):
+        if Rmax == None:
+            Rmax = self._R500
+            
+        if self._spectrum_crp_model['name'] == 'PowerLaw':
+            CRp = naima.models.PowerLaw(1.0/u.GeV, 1.0*u.GeV, self._spectrum_crp_model['Index'])
+        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
+            CRp = naima.models.ExponentialCutoffPowerLaw(1.0/u.GeV, 1.0*u.GeV,
+                                                         self._spectrum_crp_model['Index'], self._spectrum_crp_model['PivotEnergy'])
+        else:
+            raise ValueError("The available spectra are PowerLaw and ExponentialCutoffPowerLaw for now")
+
+        # Get the pion decay model for 1 GeV-1 CRp in the volume and for 1 cm-3 of thermal gas
+        gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
+
+        # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
+        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
+        gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
+
+        # Compute the normalization volume and the integration cross density volume
+        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
+        radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
+        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
+                                                          self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
+
+        # Compute the integral spherical volume
+        r3d2 = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
+        radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        n_gas_r2 *= mu_e/mu_p
+        radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
+        
+        V_ncr_ngas = cluster_profile.get_volume_any_model(radius2.to_value('kpc'),
+                                                          n_gas_r2.to_value('cm-3')*f_crp_r2.to_value('adu'),
+                                                          Rmax.to_value('kpc'))*u.kpc**3
+        
+        # Compute the spectrum, within Rcut, assuming 1cm-3 gas, normalize by the energy computation volume and multiply by volume term
+        dN_dEdSdt = (V_ncr_ngas/V_CRenergy).to_value('')*gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
+        
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
+
