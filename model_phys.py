@@ -68,7 +68,7 @@ class Physics(object):
     - get_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the thermal
     energy profile
     - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
-
+    
     - get_normed_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the radial 
     part of the cosmic ray protons distribution, f(r), in dN/dEdV = A f(r) f(E)
     - get_normed_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV): get the spectral part
