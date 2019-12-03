@@ -22,7 +22,7 @@ from ClusterTools import cluster_global
 from ClusterTools import cluster_profile
 from ClusterTools import cluster_spectra
 from ClusterTools import cluster_xspec
-from ClusterTools import cluster_spectra_kafexhiu2014
+from ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
 from ClusterTools import cluster_electron_loss
 from ClusterTools import cluster_electron_emission
 
@@ -919,14 +919,14 @@ class Physics(object):
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
 
         # Define the model
-        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
-                                                                        Y0=self._helium_mass_fraction,
-                                                                        Z0=self._metallicity_sol,
-                                                                        abundance=self._abundance,
-                                                                        hiEmodel=self._pp_interaction_model,
-                                                                        Epmin=self._Epmin,
-                                                                        Epmax=self._Epmax,
-                                                                        NptEpPd=self._Npt_per_decade_integ)
+        model = K14.PPmodel(Jp,
+                            Y0=self._helium_mass_fraction,
+                            Z0=self._metallicity_sol,
+                            abundance=self._abundance,
+                            hiEmodel=self._pp_interaction_model,
+                            Epmin=self._Epmin,
+                            Epmax=self._Epmax,
+                            NptEpPd=self._Npt_per_decade_integ)
         
         # Extract the spectrum
         dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H).T
@@ -967,14 +967,14 @@ class Physics(object):
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
 
         # Define the model
-        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
-                                                                        Y0=self._helium_mass_fraction,
-                                                                        Z0=self._metallicity_sol,
-                                                                        abundance=self._abundance,
-                                                                        hiEmodel=self._pp_interaction_model,
-                                                                        Epmin=self._Epmin,
-                                                                        Epmax=self._Epmax,
-                                                                        NptEpPd=self._Npt_per_decade_integ)
+        model = K14.PPmodel(Jp,
+                            Y0=self._helium_mass_fraction,
+                            Z0=self._metallicity_sol,
+                            abundance=self._abundance,
+                            hiEmodel=self._pp_interaction_model,
+                            Epmin=self._Epmin,
+                            Epmax=self._Epmax,
+                            NptEpPd=self._Npt_per_decade_integ)
         
         # Extract the spectrum
         dN_dEdVdt = model.electron_spectrum(energy, radius, n_H).T
@@ -1016,15 +1016,15 @@ class Physics(object):
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
 
         # Define the model
-        model = cluster_spectra_kafexhiu2014.ClusterSpectraKafexhiu2014(Jp,
-                                                                        Y0=self._helium_mass_fraction,
-                                                                        Z0=self._metallicity_sol,
-                                                                        abundance=self._abundance,
-                                                                        hiEmodel=self._pp_interaction_model,
-                                                                        Epmin=self._Epmin,
-                                                                        Epmax=self._Epmax,
-                                                                        NptEpPd=self._Npt_per_decade_integ)
-        
+        model = K14.PPmodel(Jp,
+                            Y0=self._helium_mass_fraction,
+                            Z0=self._metallicity_sol,
+                            abundance=self._abundance,
+                            hiEmodel=self._pp_interaction_model,
+                            Epmin=self._Epmin,
+                            Epmax=self._Epmax,
+                            NptEpPd=self._Npt_per_decade_integ)
+    
         # Extract the spectrum
         if flavor == 'all':
             dN_dEdVdt1 = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
