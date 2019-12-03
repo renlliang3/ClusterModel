@@ -67,6 +67,7 @@ class Physics(object):
     - get_fgas_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the gas fraction profile
     - get_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the thermal
     energy profile
+    - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
 
     - get_normed_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the radial 
     part of the cosmic ray protons distribution, f(r), in dN/dEdV = A f(r) f(E)
@@ -74,6 +75,8 @@ class Physics(object):
     of the cosmic ray proton distribution, f(E), in dN/dEdV = A f(r) f(E)
     - _get_crp_normalization(self): compute the normalization of the cosmic ray proton distribution, 
     A, in dN/dEdV = A f(r) f(E)
+    - get_crp_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc): compute
+    the CRp distribution on a 2d grid (energy vs radius) as dN/dEdV
     - get_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None, 
     Energy_density=False): compute the cosmic ray proton density profile integrating over the energy 
     between Emin and Emax.
@@ -81,7 +84,24 @@ class Physics(object):
     spectrum integrating over the volume up to Rmax
     - get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
     compute the cosmic ray proton energy (between Emin and Emax) to thermal energy profile.
-    - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
+
+    - get_rate_gamma_ray(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    compute the gamma ray emission rate dN/dEdVdt versus energy and radius
+    - get_rate_cre(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    compute the CRe production rate dN/dEdVdt versus energy and radius
+    - get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc, flavor='all'):
+    compute the neutrino production rate dN/dEdVdt versus energy and radius
+    
+    - get_cre_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    compute the CRe population assuming equilibrium dN/dEdV versus energy and radius
+    - get_density_cre_profile(self, radius=np.logspace(0,4,100)*u.kpc,Emin=None, Emax=None, Energy_density=False):
+    compute the cosmic ray electron density profile integrating over the energy between Emin and Emax.
+    - get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None): compute the cosmic ray electron
+    spectrum integrating over the volume up to Rmax
+    - get_synchrotron_rate(self, frequency=np.logspace(-3,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc):
+    compute the synchrotron emission per unit volume given the electron population and magnetic field
+    - get_ic_rate(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    compute the inverse compton emission per unit volume given the electron population and CMB(z)
 
     """
     
@@ -777,7 +797,7 @@ class Physics(object):
         dN_dEdV = self.get_crp_2d(eng, radius)
 
         if Energy_density:
-            profile = (model_tools.trapz_loglog(np.vstack(eng) * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
+            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
         else:
             profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis=0)).to('cm-3')
             
@@ -1087,6 +1107,89 @@ class Physics(object):
         dN_dEdV[w_neg] = 0
         
         return dN_dEdV.to('GeV-1 cm-3')
+
+
+    #==================================================
+    # Get the CR electron density profile
+    #==================================================
+    
+    def get_density_cre_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                Emin=None, Emax=None, Energy_density=False):
+        """
+        Compute the cosmic ray electron density profile, integrating energies 
+        between Emin and Emax.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - Emin (quantity): the lower bound for energy integration
+        - Emax (quantity): the upper bound for energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+
+        Outputs
+        ----------
+        - density (quantity): in unit of cm-3 or GeV cm-3
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Define energy
+        if Emin is None:
+            Emin = (const.m_e*const.c**2).to('GeV')
+        if Emax is None:
+            Emax = self._Epmax        
+            
+        # Integrate over the spectrum
+        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dEdV = self.get_cre_2d(eng, radius)
+
+        if Energy_density:
+            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
+        else:
+            profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis=0)).to('cm-3')
+            
+        return radius, profile
+
+
+    #==================================================
+    # Get the CR proton spectrum
+    #==================================================
+    
+    def get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None):
+        """
+        Compute the cosmic ray proton spectrum, integrating radius 
+        between 0 and Rmax.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR protons
+        - Rmax (quantity): the radius within with the spectrum is computed 
+        (default is R500)
+
+        Outputs
+        ----------
+        - spectrum (quantity): in unit of GeV-1
+
+        """
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+
+        # define radius
+        if Rmax is None:
+            Rmax = self._R500
+                
+        # Integrate over the considered volume
+        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
+        rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dEdV = self.get_cre_2d(energy, rad)
+
+        spectrum = model_tools.trapz_loglog(4*np.pi*rad**2 * dN_dEdV, rad)
+
+        return energy, spectrum.to('GeV-1')
     
     
     #==================================================
