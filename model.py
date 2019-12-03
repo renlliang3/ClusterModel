@@ -43,7 +43,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     To do list
     ----------  
     - Compute observables associated to all quantities
-    - remove radius/energy outputs in functions
     
     Attributes
     ----------  
