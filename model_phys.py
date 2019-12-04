@@ -1196,7 +1196,7 @@ class Physics(object):
     # Get the synchrotron spectrum
     #==================================================
     
-    def get_synchrotron_rate(self, frequency=np.logspace(-3,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc):
+    def get_synchrotron_rate(self, energy=np.logspace(-9,-2,100)*u.eV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the synchrotron density as dN/dEdVdt = f(E, r)
         
@@ -1228,8 +1228,7 @@ class Physics(object):
                                                                   NptEePd=self._Npt_per_decade_integ)
         
         # Extract the spectrum: what is long is evaluating Je inside the code
-        Ephoton = const.h * frequency
-        dN_dEdVdt = model.synchrotron(Ephoton, radius_input=radius, B=B).T
+        dN_dEdVdt = model.synchrotron(energy, radius_input=radius, B=B).T
                 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
