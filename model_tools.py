@@ -183,3 +183,185 @@ def trapz_loglog(y, x, axis=-1, intervals=False):
     
     return ret
 
+#==================================================
+# Compute spectrum (spherical)
+#==================================================
+
+def compute_spectrum_spherical(dN_dEdVdt, radius):
+    """
+    Integrate over the spherical volume to get the spectrum:
+    \int_Rmin^Rmax 4 pi r^2 dN_dEdVdt(E,r) dr
+    
+    Parameters
+    ----------
+    - dN_dEdVdt (2d array): Input array to integrate.
+    - radius (array): Radius variable to integrate over.
+    
+    Returns
+    -------
+    dN_dEdt (array): integrated quantity
+
+    """
+
+    dN_dEdt = trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
+
+    return dN_dEdt
+
+
+#==================================================
+# Compute spectrum (cylindrical)
+#==================================================
+
+def compute_spectrum_cylindrical_loop(dN_dEdVdt, eng, r2d, los):
+    """
+    Integrate over the spherical volume to get the spectrum:
+    \int_Rmin^Rmax 4 pi r^2 dN_dEdVdt(E,r) dr
+    
+    Parameters
+    ----------
+    - dN_dEdVdt (2d array): a function of variable 1 (ex: energy) and radius.
+    - eng (quantity array): energy
+    - r2d (quantity array): projected radius
+    - los (quantity array): line of sight (one side only)
+    
+    Returns
+    -------
+    dN_dEdt (array): integrated quantity
+
+    """
+
+    dN_dEdVdt_proj = np.zeros((len(eng), len(r2d)))*u.kpc*u.GeV**-1*u.cm**-3*u.s**-1
+    
+    for i in range(len(eng)):
+        def dN_dEdVdt_1d(r): return dN_dEdVdt(eng[i], r)
+        dN_dEdVdt_proj[i,:] = compute_los_integral(dN_dEdVdt_1d, r2d, los)
+
+    dN_dEdt = trapz_loglog(2*np.pi*r2d*dN_dEdVdt_proj, r2d, axis=1, intervals=False)
+
+    return dN_dEdt
+
+#==================================================
+# Compute spectrum (cylindrical)
+#==================================================
+
+def compute_spectrum_cylindrical(dN_dEdVdt, eng, r2d, los):
+    """
+    Integrate over the spherical cylindrical volume to get the spectrum:
+    \int_Rmin^Rmax 2 pi r dr \int_Rmin^Rmax dN_dEdVdt(E,r) dl
+    
+    Parameters
+    ----------
+    - dN_dEdVdt (2d array): a function of energy and radius.
+    - eng (quantity array): energy
+    - r2d (quantity array): projected radius
+    - los (quantity array): line of sight (one side only)
+    
+    Returns
+    -------
+    dN_dEdt (array): integrated quantity
+
+    """
+
+    # First compute the los integral assuming a 2d function to get: f(E, r2d)
+    dN_dEdVdt_proj = compute_los_integral_2dfunc(dN_dEdVdt, eng, r2d, los)
+
+    # Then integrate over the surface
+    dN_dEdt = trapz_loglog(2*np.pi*r2d*dN_dEdVdt_proj, r2d, axis=1, intervals=False)
+
+    return dN_dEdt
+
+
+#==================================================
+# Compute l.o.s. integral for a 2d function
+#==================================================
+
+def compute_los_integral_2dfunc(f_E_r, eng, r2d, los):
+    """
+    Compute the line of sight integral in the case of a 
+    function in the case of a dependance of E and r:
+    \int_Rmin^Rmax y(E,r) dl
+    
+    Parameters
+    ----------
+    - f_E_r (function): a function of energy and radius.
+    In practice energy can be anything.
+    - eng (quantity array): energy
+    - r2d (quantity array): projected radius
+    - los (quantity array): line of sight (one side only)
+    
+    Returns
+    -------
+    I_los (array): integrated quantity
+
+    """
+
+    import time
+    t1 = time.time()
+    
+    Neng = len(eng)
+    Nr2d = len(r2d)
+    Nlos = len(los)
+
+    # Compute 2d grids as Nr2d, Nlos to get the 3d radius array
+    r2d_g2 = replicate_array(r2d, Nlos, T=True)
+    los_g2 = replicate_array(los, Nr2d, T=False)
+    r3d_g2 = np.sqrt(r2d_g2**2 + los_g2**2)
+    
+    # Get a flat array
+    r3d_g2_flat = np.ndarray.flatten(r3d_g2)
+    
+    # Compute f_E_r(E, r)
+    f_E_r_g2_flat = f_E_r(eng, r3d_g2_flat)     # Here it takes long: compute on smaller grid and interpolate
+    
+    # Reshape it as Neng, Nr2d, Nlos
+    f_E_r_g3 = np.reshape(f_E_r_g2_flat, (Neng, Nr2d, Nlos))
+    
+    # compute integral
+    I_los = trapz_loglog(2*f_E_r_g3, los, axis=2, intervals=False)
+    
+    return I_los
+
+
+#==================================================
+# Compute l.o.s. integral for a 2d function
+#==================================================
+
+def compute_los_integral(f_r, r2d, los):
+    """
+    Compute the line of sight integral in the case of a 
+    function r only:
+    \int_Rmin^Rmax y(r) dl
+    
+    Parameters
+    ----------
+    - f_r (function): a function of radius.
+    - r2d (quantity array): projected radius
+    - los (quantity array): line of sight (one side only)
+    
+    Returns
+    -------
+    I_los (array): integrated quantity
+
+    """
+
+    Nr2d = len(r2d)
+    Nlos = len(los)
+
+    # Compute 2d grids as Nr2d, Nlos to get the 3d radius array
+    r2d_g2 = replicate_array(r2d, Nlos, T=True)
+    los_g2 = replicate_array(los, Nr2d, T=False)
+    r3d_g2 = np.sqrt(r2d_g2**2 + los_g2**2)
+
+    # Get a flat array
+    r3d_g2_flat = np.ndarray.flatten(r3d_g2)
+
+    # Compute f_r(r)
+    f_r_g2_flat = f_r(r3d_g2_flat)
+    
+    # Reshape it as Nr2d, Nlos
+    f_r_g2 = np.reshape(f_r_g2_flat, (Nr2d, Nlos))
+    
+    # Compute integral
+    I_los = trapz_loglog(2*f_r_g2, los, axis=1, intervals=False)
+
+    return I_los
