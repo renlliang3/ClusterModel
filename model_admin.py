@@ -18,7 +18,7 @@ class Admin(object):
     """ Admin class
     This class searves as a parser to the main Cluster class, to 
     include the subclass Admin in this other file.
-
+    
     Attributes
     ----------  
     The attributes are the same as the Cluster class, see model.py
@@ -39,6 +39,8 @@ class Admin(object):
     
     - _save_txt_file(self, filename, col1, col2, col1_name, col2_name, ndec=20): internal method 
     dedicated to save data in special format
+
+    - get_map_header(self) : return the map header.
 
     """
     
@@ -505,4 +507,41 @@ class Admin(object):
                               ('{:>'+str(ncar)+'}').format(''),
                               ('{:.'+str(ndec)+'e}').format(col2[il])+'\n'])
         sfile.close()
+        
+        
+    #==================================================
+    # Extract the header
+    #==================================================
+    
+    def get_map_header(self):
+        """
+        Extract the header of the map
+        
+        Parameters
+        ----------
+
+        Outputs
+        ----------
+        - header (astropy object): the header associated to the map
+
+        """
+
+        # Get the needed parameters in case of map header
+        if self._map_header != None:
+            header = self._map_header
+            
+        # Get the needed parameters in case of set-by-hand map parameters
+        elif (self._map_coord != None) and (self._map_reso != None) and (self._map_fov != None):
+            header = map_tools.define_std_header(self._map_coord.icrs.ra.to_value('deg'),
+                                                 self._map_coord.icrs.dec.to_value('deg'),
+                                                 self._map_fov.to_value('deg')[0],
+                                                 self._map_fov.to_value('deg')[1],
+                                                 self._map_reso.to_value('deg'))
+            
+        # Otherwise there is a problem
+        else:
+            raise TypeError("A header, or the map_coord & map_reso & map_fov should be defined.")
+
+        return header        
+        
 
