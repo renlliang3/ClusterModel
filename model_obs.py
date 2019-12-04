@@ -16,6 +16,8 @@ from astropy import constants as const
 
 import naima
 
+from ClusterModel import model_tools 
+
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_profile 
 from ClusterTools import cluster_spectra 
@@ -37,16 +39,6 @@ class Observables(object):
 
     Methods
     ----------  
-    - get_map_header(self) : return the map header.
-
-    - get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the spherically 
-    integrated compton parameter profile
-    - get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the cylindrincally 
-    integrated Compton parameter profile
-    - get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
-    compute the Compton parameter profile
-    - get_ymap(self, FWHM=None, NR500max=5.0, Npt_los=100): compute a Compton parameter map.
-
     - get_gamma_spectrum(self, energy=np.logspace(-2,6,1000)*u.GeV, Rmax=None,type_integral='spherical', 
     NR500max=5.0, Npt_los=100): compute the gamma ray spectrum integrating over the volume up to Rmax
     - get_gamma_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=10.0*u.MeV, Emax=1.0*u.PeV, 
@@ -57,6 +49,14 @@ class Observables(object):
     energy range and for R>Rmax.
     - get_gamma_template_map(self, NR500max=5.0, Npt_los=100): compute the gamma ray template map, 
     normalized so that the integral over the overall cluster is 1.
+
+    - get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the spherically 
+    integrated compton parameter profile
+    - get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the cylindrincally 
+    integrated Compton parameter profile
+    - get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+    compute the Compton parameter profile
+    - get_ymap(self, FWHM=None, NR500max=5.0, Npt_los=100): compute a Compton parameter map.
 
     - get_sx_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100,
     output_type='S'): compute the Xray surface brightness profile
@@ -70,243 +70,51 @@ class Observables(object):
     """
     
     #==================================================
-    # Extract the header
-    #==================================================
-    
-    def get_map_header(self):
-        """
-        Extract the header of the map
-        
-        Parameters
-        ----------
-
-        Outputs
-        ----------
-        - header (astropy object): the header associated to the map
-
-        """
-
-        # Get the needed parameters in case of map header
-        if self._map_header != None:
-            header = self._map_header
-            
-        # Get the needed parameters in case of set-by-hand map parameters
-        elif (self._map_coord != None) and (self._map_reso != None) and (self._map_fov != None):
-            header = map_tools.define_std_header(self._map_coord.icrs.ra.to_value('deg'),
-                                                 self._map_coord.icrs.dec.to_value('deg'),
-                                                 self._map_fov.to_value('deg')[0],
-                                                 self._map_fov.to_value('deg')[1],
-                                                 self._map_reso.to_value('deg'))
-            
-        # Otherwise there is a problem
-        else:
-            raise TypeError("A header, or the map_coord & map_reso & map_fov should be defined.")
-
-        return header        
-        
-    
-    #==================================================
-    # Compute Ysph
-    #==================================================
-
-    def get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
-        """
-        Get the spherically integrated Compton parameter profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Ysph_r (quantity): the integrated Compton parameter (homogeneous to kpc^2)
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        #---------- Define radius associated to the pressure
-        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the density profile
-        rad, p_r = self.get_pressure_gas_profile(radius=press_radius)
-
-        #---------- Integrate the pressure in 3d
-        I_p_gas_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            I_p_gas_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), p_r.to_value('keV cm-3'),
-                                                                radius.to_value('kpc')[i], Npt=1000)
-        
-        Ysph_r = const.sigma_T/(const.m_e*const.c**2) * I_p_gas_r*u.Unit('keV cm-3 kpc3')
-
-        return radius, Ysph_r.to('kpc2')
-
-
-    #==================================================
-    # Compute Ycyl
-    #==================================================
-
-    def get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
-        """
-        Get the integrated cylindrical Compton parameter profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500max (float): the integration will stop at NR500max x R500
-        - Npt_los (int): the number of points for line of sight integration
-        
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Ycyl_r : the integrated Compton parameter
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        #---------- Define radius associated to the Compton parameter
-        y_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the Compton parameter profile
-        r2d, y_r = self.get_y_compton_profile(y_radius, NR500max=NR500max, Npt_los=Npt_los)
-
-        #---------- Integrate the Compton parameter in 2d
-        Ycyl_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            Ycyl_r[i] = cluster_profile.get_surface_any_model(r2d.to_value('kpc'), y_r.to_value('adu'),
-                                                              radius.to_value('kpc')[i], Npt=1000)
-        
-        return radius, Ycyl_r*u.Unit('kpc2')
-
-    
-    #==================================================
-    # Compute y profile
-    #==================================================
-    
-    def get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
-        """
-        Get the Compton parameter profile.
-        
-        Parameters
-        ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500max (float): the integration will stop at NR500max x R500
-        - Npt_los (int): the number of points for line of sight integration
-        
-        Outputs
-        ----------
-        - Rproj (quantity): the projected 2d radius in unit of kpc
-        - y_r : the Compton parameter
-
-        Note
-        ----------
-        The pressure profile is truncated at R500 along the line-of-sight.
-
-        """
-        
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        # Define radius associated to the pressure
-        p_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
-                                                            Rmin=1.0, Rmax=NR500max*self._R500.to_value('kpc'),
-                                                            Nptmin=1000)*u.kpc
-        
-        # Get the pressure profile
-        rad3d, p_r = self.get_pressure_gas_profile(radius=p_radius)
-
-        # Project it
-        Rmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
-        Rpmax = np.amax(radius.to_value('kpc'))              # Max radius to which we get the profile
-        Rproj, Pproj = cluster_profile.proj_any_model(rad3d.to_value('kpc'), p_r.to_value('keV cm-3'),
-                                                      Npt=Npt_los, Rmax=Rmax, Rpmax=Rpmax, Rp_input=radius.to_value('kpc'))
-        
-        # Get the Compton parameter
-        Rproj *= u.kpc
-        y_compton = Pproj*u.Unit('keV cm-3 kpc') * const.sigma_T/(const.m_e*const.c**2)
-
-
-        # Apply truncation in case
-        y_compton[Rproj > self._R_truncation] = 0.0
-        
-        return Rproj.to('kpc'), y_compton.to_value('')*u.adu
-
-    
-    #==================================================
-    # Compute y map 
-    #==================================================
-    
-    def get_ymap(self, FWHM=None, NR500max=5.0, Npt_los=100):
-        """
-        Compute a Compton parameter ymap.
-        
-        Parameters
-        ----------
-        - FWHM (quantity) : the beam smoothing FWHM (homogeneous to deg)
-        - NR500max (float): the integration will stop at NR500max x R500
-        - Npt_los (int): the number of points for line of sight integration
-
-        Outputs
-        ----------
-        - ymap (adu) : the Compton parameter map
-
-        """
-        
-        # Get the header
-        header = self.get_map_header()
-        w = WCS(header)
-        if w.wcs.has_cd():
-            if w.wcs.cd[1,0] != 0 or w.wcs.cd[0,1] != 0:
-                print('!!! WARNING: R.A and Dec. is rotated wrt x and y. The extracted resolution was not checked in such situation.')
-            map_reso_x = np.sqrt(w.wcs.cd[0,0]**2 + w.wcs.cd[1,0]**2)
-            map_reso_y = np.sqrt(w.wcs.cd[1,1]**2 + w.wcs.cd[0,1]**2)
-        else:
-            map_reso_x = np.abs(w.wcs.cdelt[0])
-            map_reso_y = np.abs(w.wcs.cdelt[1])
-        
-        # Get a R.A-Dec. map
-        ra_map, dec_map = map_tools.get_radec_map(header)
-
-        # Get a cluster distance map
-        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
-
-        # Define the radius used fo computing the Compton parameter profile
-        theta_max = np.amax(dist_map) # maximum angle from the cluster
-        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
-        if theta_min == 0:
-            theta_min = 1e-4 # Zero will cause bug, put <1arcsec in this case
-        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
-        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
-        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
-
-        # Compute the Compton parameter projected profile
-        r_proj, y_profile = self.get_y_compton_profile(radius, NR500max=NR500max, Npt_los=Npt_los) # kpc, [y]
-        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                                 # degrees
-        
-        # Interpolate the profile onto the map
-        ymap = map_tools.profile2map(y_profile.to_value('adu'), theta_proj, dist_map)
-        
-        # Avoid numerical residual ringing from interpolation
-        ymap[dist_map > self._theta_truncation.to_value('deg')] = 0
-        
-        # Smooth the ymap if needed
-        if FWHM != None:
-            FWHM2sigma = 1.0/(2.0*np.sqrt(2*np.log(2)))
-            ymap = ndimage.gaussian_filter(ymap, sigma=(FWHM2sigma*FWHM.to_value('deg')/map_reso_x,
-                                                        FWHM2sigma*FWHM.to_value('deg')/map_reso_y), order=0)
-
-        return ymap*u.adu
-
-    
-    #==================================================
     # Compute gamma ray spectrum
     #==================================================
+
+    def get_gamma_spectrum2(self, energy=np.logspace(-2,6,100)*u.GeV,
+                            Rmin=None, Rmax=None,
+                            type_integral='spherical',
+                            NR500max=5.0):
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        # Compute the integral
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_gamma_ray(energy, rad)
+            dN_dEdt = model_tools.compute_spectrum_spherical(dN_dEdVdt, rad)
+            
+        # Compute the integral        
+        if type_integral == 'cylindrical':
+            los = model_tools.sampling_array(Rmin, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdt = model_tools.compute_spectrum_cylindrical(self.get_rate_gamma_ray, energy, r2d, los)
+            #dN_dEdt = model_tools.compute_spectrum_cylindrical_loop(self.get_rate_gamma_ray, energy, r2d, los)
+        
+        # From intrinsic luminosity to flux
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+        
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
     
-    def get_gamma_spectrum(self, energy=np.logspace(-2,6,1000)*u.GeV, Rmax=None,
+
+
+    
+    def get_gamma_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV, Rmax=None,
                            type_integral='spherical', NR500max=5.0, Npt_los=100):
         """
         Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -618,6 +426,228 @@ class Observables(object):
         return gamma_template_norm.to('sr-1')
 
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    #==================================================
+    # Compute Ysph
+    #==================================================
+
+    def get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+        """
+        Get the spherically integrated Compton parameter profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - Ysph_r (quantity): the integrated Compton parameter (homogeneous to kpc^2)
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+
+        #---------- Define radius associated to the pressure
+        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        
+        #---------- Get the density profile
+        rad, p_r = self.get_pressure_gas_profile(radius=press_radius)
+
+        #---------- Integrate the pressure in 3d
+        I_p_gas_r = np.zeros(len(radius))
+        for i in range(len(radius)):
+            I_p_gas_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), p_r.to_value('keV cm-3'),
+                                                                radius.to_value('kpc')[i], Npt=1000)
+        
+        Ysph_r = const.sigma_T/(const.m_e*const.c**2) * I_p_gas_r*u.Unit('keV cm-3 kpc3')
+
+        return radius, Ysph_r.to('kpc2')
+
+
+    #==================================================
+    # Compute Ycyl
+    #==================================================
+
+    def get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+        """
+        Get the integrated cylindrical Compton parameter profile.
+        
+        Parameters
+        ----------
+        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+        
+        Outputs
+        ----------
+        - radius (quantity): the 3d radius in unit of kpc
+        - Ycyl_r : the integrated Compton parameter
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+
+        #---------- Define radius associated to the Compton parameter
+        y_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        
+        #---------- Get the Compton parameter profile
+        r2d, y_r = self.get_y_compton_profile(y_radius, NR500max=NR500max, Npt_los=Npt_los)
+
+        #---------- Integrate the Compton parameter in 2d
+        Ycyl_r = np.zeros(len(radius))
+        for i in range(len(radius)):
+            Ycyl_r[i] = cluster_profile.get_surface_any_model(r2d.to_value('kpc'), y_r.to_value('adu'),
+                                                              radius.to_value('kpc')[i], Npt=1000)
+        
+        return radius, Ycyl_r*u.Unit('kpc2')
+
+    
+    #==================================================
+    # Compute y profile
+    #==================================================
+    
+    def get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500max=5.0, Npt_los=100):
+        """
+        Get the Compton parameter profile.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+        
+        Outputs
+        ----------
+        - Rproj (quantity): the projected 2d radius in unit of kpc
+        - y_r : the Compton parameter
+
+        Note
+        ----------
+        The pressure profile is truncated at R500 along the line-of-sight.
+
+        """
+        
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius)
+
+        # Define radius associated to the pressure
+        p_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
+                                                            Rmin=1.0, Rmax=NR500max*self._R500.to_value('kpc'),
+                                                            Nptmin=1000)*u.kpc
+        
+        # Get the pressure profile
+        rad3d, p_r = self.get_pressure_gas_profile(radius=p_radius)
+
+        # Project it
+        Rmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
+        Rpmax = np.amax(radius.to_value('kpc'))              # Max radius to which we get the profile
+        Rproj, Pproj = cluster_profile.proj_any_model(rad3d.to_value('kpc'), p_r.to_value('keV cm-3'),
+                                                      Npt=Npt_los, Rmax=Rmax, Rpmax=Rpmax, Rp_input=radius.to_value('kpc'))
+        
+        # Get the Compton parameter
+        Rproj *= u.kpc
+        y_compton = Pproj*u.Unit('keV cm-3 kpc') * const.sigma_T/(const.m_e*const.c**2)
+
+
+        # Apply truncation in case
+        y_compton[Rproj > self._R_truncation] = 0.0
+        
+        return Rproj.to('kpc'), y_compton.to_value('')*u.adu
+
+    
+    #==================================================
+    # Compute y map 
+    #==================================================
+    
+    def get_ymap(self, FWHM=None, NR500max=5.0, Npt_los=100):
+        """
+        Compute a Compton parameter ymap.
+        
+        Parameters
+        ----------
+        - FWHM (quantity) : the beam smoothing FWHM (homogeneous to deg)
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Npt_los (int): the number of points for line of sight integration
+
+        Outputs
+        ----------
+        - ymap (adu) : the Compton parameter map
+
+        """
+        
+        # Get the header
+        header = self.get_map_header()
+        w = WCS(header)
+        if w.wcs.has_cd():
+            if w.wcs.cd[1,0] != 0 or w.wcs.cd[0,1] != 0:
+                print('!!! WARNING: R.A and Dec. is rotated wrt x and y. The extracted resolution was not checked in such situation.')
+            map_reso_x = np.sqrt(w.wcs.cd[0,0]**2 + w.wcs.cd[1,0]**2)
+            map_reso_y = np.sqrt(w.wcs.cd[1,1]**2 + w.wcs.cd[0,1]**2)
+        else:
+            map_reso_x = np.abs(w.wcs.cdelt[0])
+            map_reso_y = np.abs(w.wcs.cdelt[1])
+        
+        # Get a R.A-Dec. map
+        ra_map, dec_map = map_tools.get_radec_map(header)
+
+        # Get a cluster distance map
+        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
+
+        # Define the radius used fo computing the Compton parameter profile
+        theta_max = np.amax(dist_map) # maximum angle from the cluster
+        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
+        if theta_min == 0:
+            theta_min = 1e-4 # Zero will cause bug, put <1arcsec in this case
+        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
+        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
+        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
+
+        # Compute the Compton parameter projected profile
+        r_proj, y_profile = self.get_y_compton_profile(radius, NR500max=NR500max, Npt_los=Npt_los) # kpc, [y]
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                                 # degrees
+        
+        # Interpolate the profile onto the map
+        ymap = map_tools.profile2map(y_profile.to_value('adu'), theta_proj, dist_map)
+        
+        # Avoid numerical residual ringing from interpolation
+        ymap[dist_map > self._theta_truncation.to_value('deg')] = 0
+        
+        # Smooth the ymap if needed
+        if FWHM != None:
+            FWHM2sigma = 1.0/(2.0*np.sqrt(2*np.log(2)))
+            ymap = ndimage.gaussian_filter(ymap, sigma=(FWHM2sigma*FWHM.to_value('deg')/map_reso_x,
+                                                        FWHM2sigma*FWHM.to_value('deg')/map_reso_y), order=0)
+
+        return ymap*u.adu
+
+    
     #==================================================
     # Compute a Xspec table versus temperature
     #==================================================
@@ -919,90 +949,4 @@ class Observables(object):
             raise ValueError("Output type available are S, C and R.")        
         
         return sxmap
-
-
-
-
-
-
-    
-    #====================================================================================================
-    #====================================================================================================
-    #====================================================================================================
-    #====================================================================================================
-    #====================================================================================================
-    #====================================================================================================
-
-
-
-
-
-
-
-
-    ##Test function for volume integration
-    def testfuncsync(self, frequency=np.logspace(-2,2,100)*u.GHz):
-
-        radius = np.logspace(0, np.log10(self._R500.to_value('kpc')),100)*u.kpc
-        
-        dN_dEdVdt = self.get_synchrotron_rate(frequency, radius)
-        dN_dEdt = model_tools.trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
-        dN_dEdSdt = (dN_dEdt / (4*np.pi * self._D_lum**2) * (const.h*frequency)**2 / frequency).to('Jy')
-        return frequency, dN_dEdSdt
-
-
-    
-    def testfunc(self, energy=np.logspace(-2,6,100)*u.GeV):
-
-        radius = np.logspace(0, np.log10(self._R500.to_value('kpc')),100)*u.kpc
-        
-        dN_dEdVdt = self.get_rate_gamma_ray(energy, radius)
-        dN_dEdt = model_tools.trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
-        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
-        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
-
-
-    def testfunc2(self, energy=np.logspace(-2,6,100)*u.GeV, Rmax=None,
-                  type_integral='spherical', NR500max=5.0, Npt_los=100):
-        if Rmax == None:
-            Rmax = self._R500
-            
-        if self._spectrum_crp_model['name'] == 'PowerLaw':
-            CRp = naima.models.PowerLaw(1.0/u.GeV, 1.0*u.GeV, self._spectrum_crp_model['Index'])
-        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
-            CRp = naima.models.ExponentialCutoffPowerLaw(1.0/u.GeV, 1.0*u.GeV,
-                                                         self._spectrum_crp_model['Index'], self._spectrum_crp_model['PivotEnergy'])
-        else:
-            raise ValueError("The available spectra are PowerLaw and ExponentialCutoffPowerLaw for now")
-
-        # Get the pion decay model for 1 GeV-1 CRp in the volume and for 1 cm-3 of thermal gas
-        gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
-
-        # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
-        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
-        gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
-
-        # Compute the normalization volume and the integration cross density volume
-        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
-        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
-                                                          self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
-
-        # Compute the integral spherical volume
-        r3d2 = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
-        n_gas_r2 *= mu_e/mu_p
-        radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
-        
-        V_ncr_ngas = cluster_profile.get_volume_any_model(radius2.to_value('kpc'),
-                                                          n_gas_r2.to_value('cm-3')*f_crp_r2.to_value('adu'),
-                                                          Rmax.to_value('kpc'))*u.kpc**3
-        
-        # Compute the spectrum, within Rcut, assuming 1cm-3 gas, normalize by the energy computation volume and multiply by volume term
-        dN_dEdSdt = (V_ncr_ngas/V_CRenergy).to_value('')*gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
-        
-        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
-
 
