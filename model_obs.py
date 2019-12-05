@@ -1400,6 +1400,15 @@ class Observables(object):
 
         return ymap*u.adu
 
+
+
+
+
+
+
+
+
+
     
     #==================================================
     # Compute a Xspec table versus temperature
