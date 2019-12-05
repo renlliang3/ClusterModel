@@ -10,6 +10,8 @@ import pickle
 from astropy.table import Table, Column
 from astropy.io import fits
 
+from ClusterTools import map_tools
+
 #==================================================
 # Admin class
 #==================================================

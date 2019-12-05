@@ -73,11 +73,31 @@ class Observables(object):
     # Compute gamma ray spectrum
     #==================================================
 
-    def get_gamma_spectrum2(self, energy=np.logspace(-2,6,100)*u.GeV,
+    def get_gamma_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV,
                             Rmin=None, Rmax=None,
                             type_integral='spherical',
                             NR500max=5.0):
+        """
+        Compute the gamma ray emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the gamma ray emmission enclosed within an circular area (i.e.
+        cylindrical).
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of gamma rays
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
 
+        Outputs
+        ----------
+        - energy (quantity) : the physical energy of gamma rays
+        - dN_dEdSdt (np.ndarray) : the spectrum in units of GeV-1 cm-2 s-1
+
+        """
+                
         # In case the input is not an array
         energy = model_tools.check_qarray(energy, unit='GeV')
 
@@ -96,223 +116,111 @@ class Observables(object):
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
             dN_dEdVdt = self.get_rate_gamma_ray(energy, rad)
-            dN_dEdt = model_tools.compute_spectrum_spherical(dN_dEdVdt, rad)
+            dN_dEdt = model_tools.spherical_integration_2dfunc(dN_dEdVdt, rad)
             
         # Compute the integral        
         if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)
+            r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdt = model_tools.compute_spectrum_cylindrical(self.get_rate_gamma_ray, energy, r2d, los)
-            #dN_dEdt = model_tools.compute_spectrum_cylindrical_loop(self.get_rate_gamma_ray, energy, r2d, los)
+            dN_dEdVdt = self.get_rate_gamma_ray(energy, r3d)
+            dN_dEdt = model_tools.cylindrical_integration_2dfunc(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
         
         # From intrinsic luminosity to flux
         dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
-        
-        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
 
-    
-
-
-    
-    def get_gamma_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV, Rmax=None,
-                           type_integral='spherical', NR500max=5.0, Npt_los=100):
-        """
-        Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
-        integrated), or the gamma ray emmission enclosed within an circular area (i.e.
-        cylindrical).
-        
-        Parameters
-        ----------
-        - energy (quantity) : the physical energy of gamma rays
-        - Rmax (quantity): the radius within with the spectrum is computed 
-        (default is R500)
-        - type_integral (string): either 'spherical' or 'cylindrical'
-        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
-        This is used only for cylindrical case
-        - Npt_los (int): the number of points for line of sight integration.
-        This is used only for cylindrical case
-
-        Outputs
-        ----------
-        - energy (quantity) : the physical energy of gamma rays
-        - dN_dEdSdt (np.ndarray) : the spectrum in units of MeV-1 cm-2 s-1
-
-        """
-        if np.amin(energy) < 9.9999*u.MeV or np.amax(energy) > 1.00001*u.PeV:
-            print('!!! WARNING: outside of 10MeV-1PeV, Naima appears to return wrong spectra (flat).')
-            print('    E_min - Emax range : '+str(np.amin(energy.to_value('MeV')))+' MeV - '+str(np.amax(energy.to_value('PeV')))+' PeV')
-            
-        if Rmax == None:
-            Rmax = self._R500
-        
-        # Define a cosmic ray proton object normalized to 1 GeV-1 at E_CR = 1 GeV
-        if self._spectrum_crp_model['name'] == 'PowerLaw':
-            CRp = naima.models.PowerLaw(1.0/u.GeV, 1.0*u.GeV, self._spectrum_crp_model['Index'])
-        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
-            CRp = naima.models.ExponentialCutoffPowerLaw(1.0/u.GeV, 1.0*u.GeV,
-                                                          self._spectrum_crp_model['Index'], self._spectrum_crp_model['PivotEnergy'])
-        else:
-            raise ValueError("The available spectra are PowerLaw and ExponentialCutoffPowerLaw for now")
-
-        # Get the pion decay model for 1 GeV-1 CRp in the volume and for 1 cm-3 of thermal gas
-        gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
-
-        # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
-        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
-        gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
-
-        # Compute the normalization volume and the integration cross density volume
-        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
-        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1.to_value('adu'),
-                                                          self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
-
-        #---------- Compute the integral spherical volume
-        if type_integral == 'spherical':
-            r3d2 = cluster_profile.define_safe_radius_array(np.array([Rmax.to_value('kpc')]), Rmin=1.0)*u.kpc
-            radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
-            radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
-            
-            V_ncr_ngas = cluster_profile.get_volume_any_model(radius2.to_value('kpc'),
-                                                              n_gas_r2.to_value('cm-3')*f_crp_r2.to_value('adu'),
-                                                              Rmax.to_value('kpc'))*u.kpc**3
-        
-        #---------- Compute the integral sperical volume
-        elif type_integral == 'cylindrical':
-            Rlosmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
-            Rpmax = Rmax.to_value('kpc')                            # Max radius to which we get the profile
-            
-            # First project the integrand
-            r3d2 = cluster_profile.define_safe_radius_array(np.array([Rlosmax]), Rmin=1.0)*u.kpc
-            radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
-            radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
-
-            r2d3 = cluster_profile.define_safe_radius_array(np.array([Rpmax]), Rmin=1.0)*u.kpc
-            Rproj, Pproj = cluster_profile.proj_any_model(radius2.to_value('kpc'), n_gas_r2.to_value('cm-3')*f_crp_r2.to_value('adu'),
-                                                          Npt=Npt_los, Rmax=Rlosmax, Rpmax=Rpmax, Rp_input=r2d3.to_value('kpc'))
-            Rproj *= u.kpc
-            Pproj *= u.kpc
-            
-            # Then compute the integral cylindrical volume
-            V_ncr_ngas = cluster_profile.get_surface_any_model(Rproj.to_value('kpc'), Pproj.to_value('kpc'),
-                                                               Rmax.to_value('kpc'), Npt=1000)*u.kpc**3
-            
-        #---------- Error case
-        else:
-            raise ValueError('Only spherical or cylindrical options are available.')    
-            
-        # Compute the spectrum, within Rcut, assuming 1cm-3 gas, normalize by the energy computation volume and multiply by volume term
-        dN_dEdSdt = (V_ncr_ngas/V_CRenergy).to_value('')*gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
-
-        #---------- Apply EBL absorbtion
+        # Apply EBL absorbtion
         if self._EBL_model != 'none':
             absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdSdt = dN_dEdSdt * absorb
         
-        return energy, dN_dEdSdt.to('MeV-1 cm-2 s-1')
-
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
     
+
     #==================================================
     # Compute gamma ray profile
     #==================================================
-    
-    def get_gamma_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=10.0*u.MeV, Emax=1.0*u.PeV, Energy_density=False,
-                          NR500max=5.0, Npt_los=100):
+
+    def get_gamma_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                          Emin=None, Emax=None, Energy_density=False,
+                          Rmin_los=None, NR500max=5.0):
         """
         Compute the gamma ray emission profile within Emin-Emax.
         
         Parameters
         ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - radius (quantity): the projected 2d radius in units homogeneous to kpc, as a 1d array
         - Emin (quantity): the lower bound for gamma ray energy integration
         - Emax (quantity): the upper bound for gamma ray energy integration
         - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
         the number density is computed.
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
-        - Npt_los (int): the number of points for line of sight integration.
 
         Outputs
         ----------
         - dN_dSdtdO (np.ndarray) : the spectrum in units of cm-2 s-1 sr-1 or GeV cm-2 s-1 sr-1
 
         """
-
-        if Emin < 9.9999*u.MeV or Emax > 1.00001*u.PeV:
-            print('!!! WARNING: outside of 10MeV-1PeV, Naima appears to return wrong spectra (flat).')
-
         
-        # Define a cosmic ray proton object normalized to 1 GeV-1 at E_CR = 1 GeV
-        if self._spectrum_crp_model['name'] == 'PowerLaw':
-            CRp = naima.models.PowerLaw(1.0/u.GeV, 1.0*u.GeV, self._spectrum_crp_model['Index'])
-        elif self._spectrum_crp_model['name'] == 'ExponentialCutoffPowerLaw':
-            CRp = naima.models.ExponentialCutoffPowerLaw(1.0/u.GeV, 1.0*u.GeV,
-                                                          self._spectrum_crp_model['Index'], self._spectrum_crp_model['PivotEnergy'])
-        else:
-            raise ValueError("The available spectra are PowerLaw and ExponentialCutoffPowerLaw for now")
-
-        # Get the pion decay model for 1 GeV-1 CRp in the volume and for 1 cm-3 of thermal gas
-        gamma = naima.models.PionDecay(CRp, nh=1.0*u.Unit('cm**-3'), nuclear_enhancement=self._nuclear_enhancement)
-
-        # Normalize the energy of CRp in the Volume (the choice of R is arbitrary)
-        CRenergy_Rcut = self._X_cr_E['X'] * self.get_thermal_energy_profile(self._X_cr_E['R_norm'])[1][0]
-        gamma.set_Wp(CRenergy_Rcut, Epmin=self._Epmin, Epmax=self._Epmax)
-
-        # Compute the normalization volume and the integration cross density volume
-        r3d1 = cluster_profile.define_safe_radius_array(np.array([self._X_cr_E['R_norm'].to_value('kpc')]), Rmin=1.0)*u.kpc
-        radius1, f_crp_r1 = self.get_normed_density_crp_profile(r3d1)
-        V_CRenergy = cluster_profile.get_volume_any_model(radius1.to_value('kpc'), f_crp_r1, self._X_cr_E['R_norm'].to_value('kpc'))*u.kpc**3
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
-        # Compute the spectral part
-        energy = np.logspace(np.log10(Emin.to_value('GeV')), np.log10(Emax.to_value('GeV')), 1000)*u.GeV
-        dN_dEdSdt = gamma.flux(energy, distance=self._D_lum).to('MeV-1 cm-2 s-1')
+        # Get the integration limits
+        if Emin is None:
+            Emin = self._Epmin/10.0 # photon energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
+
+        # Define array for integration
+        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)        
+        r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dEdVdt = self.get_rate_gamma_ray(eng, r3d)
 
         # Apply EBL absorbtion
         if self._EBL_model != 'none':
-            absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
-            dN_dEdSdt = dN_dEdSdt * absorb
+            absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
+            dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
+            
+        # Compute energy integal
+        dN_dVdt = model_tools.energy_integration(dN_dEdVdt, eng, Energy_density=Energy_density)
 
-        # and integrate over energy
-        if Energy_density:
-            dN_dSdt = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
-                                                             energy.to_value('GeV')*dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
-                                                             Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('GeV cm-2 s-1')
-        else:
-            dN_dSdt = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
-                                                             dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
-                                                             Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('cm-2 s-1')
+        # Compute integral over l.o.s.
+        dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
+
+        # Make sure truncation is fine
+        dN_dVdt_proj[radius > self._R_truncation] = 0
         
-        # Project the integrand
-        Rlosmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
+        # Convert to physical to angular scale
+        dN_dtdO = dN_dVdt_proj * self._D_ang**2 * u.Unit('sr-1')
 
-        r3d2 = cluster_profile.define_safe_radius_array(np.array([Rlosmax]), Rmin=1.0)*u.kpc
-        radius2, n_gas_r2  = self.get_density_gas_profile(r3d2)
-        radius2, f_crp_r2 = self.get_normed_density_crp_profile(r3d2)
+        # From intrinsic luminosity to flux
+        dN_dSdtdO = dN_dtdO / (4*np.pi * self._D_lum**2)
         
-        Rproj, Pproj = cluster_profile.proj_any_model(radius2.to_value('kpc'), n_gas_r2.to_value('cm-3')*f_crp_r2,
-                                                      Npt=Npt_los, Rmax=Rlosmax, Rp_input=radius.to_value('kpc'))
-        Rproj *= u.kpc
-        Pproj *= u.kpc
-
-        # Apply truncation in case
-        Pproj[Rproj > self._R_truncation] = 0.0
-        
-        # Get the final result
-        dN_dSdtdO = dN_dSdt / V_CRenergy * self._D_ang**2 * Pproj * u.Unit('sr-1')
-
+        # return
         if Energy_density:
             dN_dSdtdO = dN_dSdtdO.to('GeV cm-2 s-1 sr-1')
         else :
             dN_dSdtdO = dN_dSdtdO.to('cm-2 s-1 sr-1')
             
-        return Rproj, dN_dSdtdO
+        return radius, dN_dSdtdO
 
-
+    
     #==================================================
     # Compute gamma ray flux
     #==================================================
     
-    def get_gamma_flux(self, Rmax=None, type_integral='spherical', NR500max=5.0, Npt_los=100,
-                       Emin=10.0*u.MeV, Emax=1.0*u.PeV, Energy_density=False):
+    def get_gamma_flux(self, Rmin=None, Rmax=None,
+                       type_integral='spherical',
+                       NR500max=5.0,
+                       Emin=None, Emax=None, Energy_density=False):
         
         """
         Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -321,12 +229,10 @@ class Observables(object):
         
         Parameters
         ----------
-        - Rmax (quantity): the radius within with the spectrum is computed 
-        (default is R500)
+        - Rmin,max (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc-R500)
         - type_integral (string): either 'spherical' or 'cylindrical'
         - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
-        This is used only for cylindrical case
-        - Npt_los (int): the number of points for line of sight integration.
         This is used only for cylindrical case
         - Emin (quantity): the lower bound for gamma ray energy integration
         - Emax (quantity): the upper bound for gamma ray energy integration
@@ -339,18 +245,34 @@ class Observables(object):
         on parameter Energy_density
 
         """
-        
-        energy = np.logspace(np.log10(Emin.to_value('GeV')),np.log10(Emax.to_value('GeV')),1000)*u.GeV
-        energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral=type_integral, NR500max=NR500max, Npt_los=Npt_los)
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+        if Emin is None:
+            Emin = self._Epmin/10.0 # photon energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+
+        # Get a spectrum
+        energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
+                                                    type_integral=type_integral, NR500max=NR500max)
+
+        # Integrate over it and return
+        flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
         
         if Energy_density:
-            flux = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
-                                                          energy.to_value('GeV')*dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
-                                                          Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('GeV cm-2 s-1')
+            flux = flux.to('GeV cm-2 s-1')
         else:
-            flux = cluster_spectra.get_integral_any_model(energy.to_value('GeV'),
-                                                          dN_dEdSdt.to_value('GeV-1 cm-2 s-1'),
-                                                          Emin.to_value('GeV'), Emax.to_value('GeV')) * u.Unit('cm-2 s-1')
+            flux = flux.to('cm-2 s-1')
             
         return flux
 
@@ -358,22 +280,34 @@ class Observables(object):
     #==================================================
     # Compute gamma map
     #==================================================
-    
-    def get_gamma_template_map(self, NR500max=5.0, Npt_los=100):
+    def get_gamma_map(self, Emin=None, Emax=None,
+                      Rmin_los=None, NR500max=5.0,
+                      Rmin=None, Rmax=None,
+                      Energy_density=False, Normalize=False):
         """
-        Compute the gamma ray template map. The map is normalized so that the integral 
-        of the map over the cluster volume is 1 (up to Rmax=5R500). In case the map is 
-        smaller than the cluster extent, the map may not be normalized to one, but the 
-        missing
+        Compute the gamma ray map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
         
         Parameters
         ----------
+        - Emin (quantity): the lower bound for gamma ray energy integration.
+        Has no effect if Normalized is True
+        - Emax (quantity): the upper bound for gamma ray energy integration
+        Has no effect if Normalized is True
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500max (float): the integration will stop at NR500max x R500
-        - Npt_los (int): the number of points for line of sight integration
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        Has no effect if Normalized is True
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
 
         Outputs
         ----------
-        gamma_template (np.ndarray) : the map in units of sr-1
+        gamma_map (np.ndarray) : the map in units of sr-1 or brightness
 
         """
 
@@ -383,72 +317,891 @@ class Observables(object):
         # Get a R.A-Dec. map
         ra_map, dec_map = map_tools.get_radec_map(header)
 
-        # Get a cluster distance map
+        # Get a cluster distance map (in deg)
         dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
-
-        # Define the radius used fo computing the Compton parameter profile
+        
+        # Define the radius used fo computing the profile
         theta_max = np.amax(dist_map) # maximum angle from the cluster
         theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
-        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
-        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
-        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
-
-        # Project the integrand
-        Rlosmax = np.amax(NR500max*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
-
-        r3d = cluster_profile.define_safe_radius_array(np.array([Rlosmax]), Rmin=1.0, Nptmin=1000)*u.kpc
-        rad, n_gas_r  = self.get_density_gas_profile(r3d)
-        rad, f_crp_r = self.get_normed_density_crp_profile(r3d)
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
-        r_proj, p_proj = cluster_profile.proj_any_model(rad.to_value('kpc'), n_gas_r.to_value('cm-3')*f_crp_r,
-                                                        Npt=Npt_los, Rmax=Rlosmax, Rp_input=radius.to_value('kpc'))
+        # Project the integrand
+        r_proj, profile = self.get_gamma_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
+                                                 Rmin_los=Rmin_los, NR500max=NR500max)
 
         # Convert to angle and interpolate onto a map
-        r_proj *= u.kpc
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
-
-        gamma_template = map_tools.profile2map(p_proj, theta_proj, dist_map)
-
+        gamma_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
+        
         # Avoid numerical residual ringing from interpolation
-        gamma_template[dist_map > self._theta_truncation.to_value('deg')] = 0
+        gamma_map[dist_map > self._theta_truncation.to_value('deg')] = 0
         
-        # Compute the normalization
-        r_proj2, p_proj2 = cluster_profile.proj_any_model(rad.to_value('kpc'), n_gas_r.to_value('cm-3')*f_crp_r,
-                                                        Npt=Npt_los, Rmax=Rlosmax, Rp_input=r3d.to_value('kpc'))
-        r_proj2 *= u.kpc
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500max*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_gamma_flux(Rmin=Rmin, Rmax=Rmax, type_integral='spherical', NR500max=NR500max,
+                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density)
+            gamma_map = gamma_map / flux
+            gamma_map = gamma_map.to('sr-1')
 
-        surface = cluster_profile.get_surface_any_model(r_proj2.to_value('kpc'), p_proj2, Rlosmax, Npt=1000)*u.kpc**2
-        omega = (surface / self._D_ang**2).to_value('')*u.sr
-
-        # Normalize
-        gamma_template_norm = gamma_template / omega
-        
-        return gamma_template_norm.to('sr-1')
+        else:
+            if Energy_density:
+                gamma_map = gamma_map.to('GeV cm-2 s-1 sr-1')
+            else :
+                gamma_map = gamma_map.to('cm-2 s-1 sr-1')
+                
+        return gamma_map
 
     
 
+    #==================================================
+    # Compute neutrinos spectrum
+    #==================================================
+
+    def get_neutrino_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV,
+                              Rmin=None, Rmax=None,
+                              type_integral='spherical',
+                              NR500max=5.0,
+                              flavor='all'):
+        """
+        Compute the neutrino emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the neutrino emmission enclosed within an circular area (i.e.
+        cylindrical).
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of neutrinos
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+        - flavor (str): either 'all', 'numu' or 'nue'
+
+        Outputs
+        ----------
+        - energy (quantity) : the physical energy of neutrino
+        - dN_dEdSdt (np.ndarray) : the spectrum in units of GeV-1 cm-2 s-1
+
+        """
+                
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        # Compute the integral
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_neutrino(energy, rad, flavor=flavor)
+            dN_dEdt = model_tools.spherical_integration_2dfunc(dN_dEdVdt, rad)
+            
+        # Compute the integral        
+        if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)
+            r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_neutrino(energy, r3d, flavor=flavor)
+            dN_dEdt = model_tools.cylindrical_integration_2dfunc(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
+        
+        # From intrinsic luminosity to flux
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+        
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+    
+
+    #==================================================
+    # Compute neutrino profile
+    #==================================================
+
+    def get_neutrino_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                             Emin=None, Emax=None, Energy_density=False,
+                             Rmin_los=None, NR500max=5.0, flavor='all'):
+        """
+        Compute the neutrino emission profile within Emin-Emax.
+        
+        Parameters
+        ----------
+        - radius (quantity): the projected 2d radius in units homogeneous to kpc, as a 1d array
+        - Emin (quantity): the lower bound for neutrino energy integration
+        - Emax (quantity): the upper bound for neutrino energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        - flavor (str): either 'all', 'numu' or 'nue'
+
+        Outputs
+        ----------
+        - dN_dSdtdO (np.ndarray) : the spectrum in units of cm-2 s-1 sr-1 or GeV cm-2 s-1 sr-1
+
+        """
+        
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Get the integration limits
+        if Emin is None:
+            Emin = self._Epmin/10.0 # photon energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
+
+        # Define array for integration
+        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)        
+        r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dEdVdt = self.get_rate_neutrino(eng, r3d, flavor=flavor)
+
+        # Compute energy integal
+        dN_dVdt = model_tools.energy_integration(dN_dEdVdt, eng, Energy_density=Energy_density)
+
+        # Compute integral over l.o.s.
+        dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
+
+        # Make sure truncation is fine
+        dN_dVdt_proj[radius > self._R_truncation] = 0
+        
+        # Convert to physical to angular scale
+        dN_dtdO = dN_dVdt_proj * self._D_ang**2 * u.Unit('sr-1')
+
+        # From intrinsic luminosity to flux
+        dN_dSdtdO = dN_dtdO / (4*np.pi * self._D_lum**2)
+        
+        # return
+        if Energy_density:
+            dN_dSdtdO = dN_dSdtdO.to('GeV cm-2 s-1 sr-1')
+        else :
+            dN_dSdtdO = dN_dSdtdO.to('cm-2 s-1 sr-1')
+            
+        return radius, dN_dSdtdO
+
+
+    #==================================================
+    # Compute neutrino flux
+    #==================================================
+    
+    def get_neutrino_flux(self, Rmin=None, Rmax=None,
+                          type_integral='spherical',
+                          NR500max=5.0,
+                          Emin=None, Emax=None, Energy_density=False,
+                          flavor='all'):
+        
+        """
+        Compute the neutrino emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the neutrino emmission enclosed within an circular area (i.e.
+        cylindrical), and in a givn energy band.
+        
+        Parameters
+        ----------
+        - Rmin,max (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc-R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+        - Emin (quantity): the lower bound for neutrino energy integration
+        - Emax (quantity): the upper bound for neutrino energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        - flavor (str): either 'all', 'numu' or 'nue'
+
+        Outputs
+        ----------
+        - flux (quantity) : the neutrino flux either in GeV/cm2/s or nu/cm2/s, depending
+        on parameter Energy_density
+
+        """
+        
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+        
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+        if Emin is None:
+            Emin = self._Epmin/10.0 # neutrino energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+
+        # Get a spectrum
+        energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        energy, dN_dEdSdt = self.get_neutrino_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
+                                                       type_integral=type_integral, NR500max=NR500max,
+                                                       flavor=flavor)
+
+        # Integrate over it and return
+        flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
+        
+        if Energy_density:
+            flux = flux.to('GeV cm-2 s-1')
+        else:
+            flux = flux.to('cm-2 s-1')
+            
+        return flux
+
+
+    #==================================================
+    # Compute neutrino map
+    #==================================================
+    def get_neutrino_map(self, Emin=None, Emax=None,
+                         Rmin_los=None, NR500max=5.0,
+                         Rmin=None, Rmax=None,
+                         Energy_density=False, Normalize=False,
+                         flavor='all'):
+        """
+        Compute the neutrino map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
+        
+        Parameters
+        ----------
+        - Emin (quantity): the lower bound for nu energy integration.
+        Has no effect if Normalized is True
+        - Emax (quantity): the upper bound for nu energy integration
+        Has no effect if Normalized is True
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        Has no effect if Normalized is True
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
+        - flavor (str): either 'all', 'numu' or 'nue'
+
+        Outputs
+        ----------
+        neutrino_map (np.ndarray) : the map in units of sr-1 or brightness
+
+        """
+
+        # Get the header
+        header = self.get_map_header()
+
+        # Get a R.A-Dec. map
+        ra_map, dec_map = map_tools.get_radec_map(header)
+
+        # Get a cluster distance map (in deg)
+        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
+        
+        # Define the radius used fo computing the profile
+        theta_max = np.amax(dist_map) # maximum angle from the cluster
+        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        
+        # Project the integrand
+        r_proj, profile = self.get_neutrino_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
+                                                    Rmin_los=Rmin_los, NR500max=NR500max, flavor=flavor)
+
+        # Convert to angle and interpolate onto a map
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
+        nu_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
+        
+        # Avoid numerical residual ringing from interpolation
+        nu_map[dist_map > self._theta_truncation.to_value('deg')] = 0
+        
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500max*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_neutrino_flux(Rmin=Rmin, Rmax=Rmax, type_integral='spherical', NR500max=NR500max,
+                                          Emin=Emin, Emax=Emax, Energy_density=Energy_density, flavor=flavor)
+            nu_map = nu_map / flux
+            nu_map = nu_map.to('sr-1')
+
+        else:
+            if Energy_density:
+                nu_map = nu_map.to('GeV cm-2 s-1 sr-1')
+            else :
+                nu_map = nu_map.to('cm-2 s-1 sr-1')
+                
+        return nu_map
+
+    
+
+    #==================================================
+    # Compute inverse compton spectrum
+    #==================================================
+
+    def get_ic_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV,
+                        Rmin=None, Rmax=None,
+                        type_integral='spherical',
+                        NR500max=5.0):
+        """
+        Compute the inverse Compton emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the inverse Compton emmission enclosed within an circular area (i.e.
+        cylindrical).
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of photons
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+
+        Outputs
+        ----------
+        - energy (quantity) : the physical energy of photons
+        - dN_dEdSdt (np.ndarray) : the spectrum in units of GeV-1 cm-2 s-1
+
+        """
+                
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        # Compute the integral
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_ic(energy, rad)
+            dN_dEdt = model_tools.spherical_integration_2dfunc(dN_dEdVdt, rad)
+            
+        # Compute the integral        
+        if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)
+            r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_ic(energy, r3d)
+            dN_dEdt = model_tools.cylindrical_integration_2dfunc(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
+        
+        # From intrinsic luminosity to flux
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+
+        # Apply EBL absorbtion
+        if self._EBL_model != 'none':
+            absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
+            dN_dEdSdt = dN_dEdSdt * absorb
+        
+        return energy, dN_dEdSdt.to('GeV-1 cm-2 s-1')
+
+
+    #==================================================
+    # Compute inverse Compton profile
+    #==================================================
+
+    def get_ic_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                       Emin=None, Emax=None, Energy_density=False,
+                       Rmin_los=None, NR500max=5.0):
+        """
+        Compute the inverse Compton emission profile within Emin-Emax.
+        
+        Parameters
+        ----------
+        - radius (quantity): the projected 2d radius in units homogeneous to kpc, as a 1d array
+        - Emin (quantity): the lower bound for IC energy integration
+        - Emax (quantity): the upper bound for IC energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+
+        Outputs
+        ----------
+        - dN_dSdtdO (np.ndarray) : the spectrum in units of cm-2 s-1 sr-1 or GeV cm-2 s-1 sr-1
+
+        """
+        
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Get the integration limits
+        if Emin is None:
+            Emin = self._Epmin/10.0 # photon energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
+
+        # Define array for integration
+        eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)        
+        r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dEdVdt = self.get_rate_ic(eng, r3d)
+
+        # Apply EBL absorbtion
+        if self._EBL_model != 'none':
+            absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
+            dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
+            
+        # Compute energy integal
+        dN_dVdt = model_tools.energy_integration(dN_dEdVdt, eng, Energy_density=Energy_density)
+
+        # Compute integral over l.o.s.
+        dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
+
+        # Make sure truncation is fine
+        dN_dVdt_proj[radius > self._R_truncation] = 0
+        
+        # Convert to physical to angular scale
+        dN_dtdO = dN_dVdt_proj * self._D_ang**2 * u.Unit('sr-1')
+
+        # From intrinsic luminosity to flux
+        dN_dSdtdO = dN_dtdO / (4*np.pi * self._D_lum**2)
+        
+        # return
+        if Energy_density:
+            dN_dSdtdO = dN_dSdtdO.to('GeV cm-2 s-1 sr-1')
+        else :
+            dN_dSdtdO = dN_dSdtdO.to('cm-2 s-1 sr-1')
+            
+        return radius, dN_dSdtdO
+
+
+    #==================================================
+    # Compute inverse Compton flux
+    #==================================================
+    
+    def get_ic_flux(self, Rmin=None, Rmax=None,
+                    type_integral='spherical',
+                    NR500max=5.0,
+                    Emin=None, Emax=None, Energy_density=False):
+        
+        """
+        Compute the inverse Compton emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the inverse Compton emmission enclosed within an circular area (i.e.
+        cylindrical), and in a given energy band.
+        
+        Parameters
+        ----------
+        - Rmin,max (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc-R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+        - Emin (quantity): the lower bound for IC energy integration
+        - Emax (quantity): the upper bound for IC energy integration
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+
+        Outputs
+        ----------
+        - flux (quantity) : the IC flux either in GeV/cm2/s or ph/cm2/s, depending
+        on parameter Energy_density
+
+        """
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+        if Emin is None:
+            Emin = self._Epmin/10.0 # photon energy down to 0.1 minimal proton energy
+        if Emax is None:
+            Emax = self._Epmax
+
+        # Get a spectrum
+        energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        energy, dN_dEdSdt = self.get_ic_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
+                                                 type_integral=type_integral, NR500max=NR500max)
+
+        # Integrate over it and return
+        flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
+        
+        if Energy_density:
+            flux = flux.to('GeV cm-2 s-1')
+        else:
+            flux = flux.to('cm-2 s-1')
+            
+        return flux
+
+    
+    #==================================================
+    # Compute IC map
+    #==================================================
+    def get_ic_map(self, Emin=None, Emax=None,
+                   Rmin_los=None, NR500max=5.0,
+                   Rmin=None, Rmax=None,
+                   Energy_density=False, Normalize=False):
+        """
+        Compute the inverse Compton map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
+        
+        Parameters
+        ----------
+        - Emin (quantity): the lower bound for IC energy integration.
+        Has no effect if Normalized is True
+        - Emax (quantity): the upper bound for IC energy integration
+        Has no effect if Normalized is True
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Energy_density (bool): if True, then the energy density is computed. Otherwise, 
+        the number density is computed.
+        Has no effect if Normalized is True
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
+
+        Outputs
+        ----------
+        ic_map (np.ndarray) : the map in units of sr-1 or brightness
+
+        """
+
+        # Get the header
+        header = self.get_map_header()
+
+        # Get a R.A-Dec. map
+        ra_map, dec_map = map_tools.get_radec_map(header)
+
+        # Get a cluster distance map (in deg)
+        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
+        
+        # Define the radius used fo computing the profile
+        theta_max = np.amax(dist_map) # maximum angle from the cluster
+        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        
+        # Project the integrand
+        r_proj, profile = self.get_ic_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
+                                              Rmin_los=Rmin_los, NR500max=NR500max)
+
+        # Convert to angle and interpolate onto a map
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
+        ic_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
+        
+        # Avoid numerical residual ringing from interpolation
+        ic_map[dist_map > self._theta_truncation.to_value('deg')] = 0
+        
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500max*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_ic_flux(Rmin=Rmin, Rmax=Rmax, type_integral='spherical', NR500max=NR500max,
+                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density)
+            ic_map = ic_map / flux
+            ic_map = ic_map.to('sr-1')
+
+        else:
+            if Energy_density:
+                ic_map = ic_map.to('GeV cm-2 s-1 sr-1')
+            else :
+                ic_map = ic_map.to('cm-2 s-1 sr-1')
+                
+        return ic_map
+
+
+    #==================================================
+    # Compute gamma ray spectrum
+    #==================================================
+
+    def get_synchrotron_spectrum(self, frequency=np.logspace(-3,2,100)*u.GHz,
+                                 Rmin=None, Rmax=None,
+                                 type_integral='spherical',
+                                 NR500max=5.0):
+        """
+        Compute the synchrotron emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the synchrotron emmission enclosed within a circular area (i.e.
+        cylindrical).
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical enery of photons
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+
+        Outputs
+        ----------
+        - frequency (quantity) : the physical energy of photons
+        - dN_dEdSdt (np.ndarray) : the spectrum in units of GeV-1 cm-2 s-1
+
+        """
+                
+        # In case the input is not an array
+        frequency = model_tools.check_qarray(frequency, unit='GHz')
+        energy = (const.h * frequency).to('eV')
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        # Compute the integral
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_synchrotron(energy, rad)
+            dN_dEdt = model_tools.spherical_integration_2dfunc(dN_dEdVdt, rad)
+            
+        # Compute the integral        
+        if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)
+            r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dEdVdt = self.get_rate_synchrotron(energy, r3d)
+            dN_dEdt = model_tools.cylindrical_integration_2dfunc(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
+        
+        # From intrinsic luminosity to flux
+        dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
+        
+        return frequency, (dN_dEdSdt * energy**2 / frequency).to('Jy')
+    
+
+    #==================================================
+    # Compute synchrotron profile
+    #==================================================
+
+    def get_synchrotron_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                freq0=1*u.GHz,
+                                Rmin_los=None, NR500max=5.0):
+        """
+        Compute the gamma ray emission profile within Emin-Emax.
+        
+        Parameters
+        ----------
+        - radius (quantity): the projected 2d radius in units homogeneous to kpc, as a 1d array
+        - freq0 (quantity): the frequency at which the profile is computed
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+
+        Outputs
+        ----------
+        - dN_dSdtdO (np.ndarray) : the spectrum in units of cm-2 s-1 sr-1 or GeV cm-2 s-1 sr-1
+
+        """
+        
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Get the integration limits
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
+
+        # Define array for integration
+        eng0 = (freq0 * const.h).to('eV')
+        Rmax3d = np.sqrt((NR500max*self._R500)**2 + Rmax**2)        
+        r3d = model_tools.sampling_array(Rmin*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500max*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dVdt_E = self.get_rate_synchrotron(eng0, r3d).flatten()
+        
+        # Compute integral over l.o.s.
+        dN_dVdt_E_proj = model_tools.los_integration_1dfunc(dN_dVdt_E, r3d, radius, los)
+
+        # Make sure truncation is fine
+        dN_dVdt_E_proj[radius > self._R_truncation] = 0
+        
+        # Convert to physical to angular scale
+        dN_dtdO_E = dN_dVdt_E_proj * self._D_ang**2 * u.Unit('sr-1')
+
+        # From intrinsic luminosity to flux
+        dN_dSdtdO_E = dN_dtdO_E / (4*np.pi * self._D_lum**2)
+        
+        # return
+        sed = (dN_dSdtdO_E * eng0**2/freq0).to('Jy sr-1')
+            
+        return radius, sed
+
+    
+    #==================================================
+    # Compute synchrotron flux
+    #==================================================
+    
+    def get_synchrotron_flux(self, Rmin=None, Rmax=None,
+                             type_integral='spherical',
+                             NR500max=5.0,
+                             freq0=1*u.GHz):
+        
+        """
+        Compute the synchrotron emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the synchrotron emmission enclosed within an circular area (i.e.
+        cylindrical), and in at given frequency (i.e. taking the spectrum at fixed nu)
+        
+        Parameters
+        ----------
+        - Rmin,max (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc-R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - NR500max (float): the line-of-sight integration will stop at NR500max x R500. 
+        This is used only for cylindrical case
+        - freq0 (quantity): the frequency at which the profile is computed
+
+        Outputs
+        ----------
+        - flux (quantity) : the synchrotron flux in Jy
+
+        """
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        # Get a spectrum value at freq0
+        freq0, flux = self.get_synchrotron_spectrum(freq0, Rmin=Rmin, Rmax=Rmax,
+                                                    type_integral=type_integral, NR500max=NR500max)
+        
+        return flux.to('Jy')
 
 
 
+    #==================================================
+    # Compute synchrotron map
+    #==================================================
+    def get_synchrotron_map(self, freq0=1*u.GHz,
+                            Rmin_los=None, NR500max=5.0,
+                            Rmin=None, Rmax=None,
+                            Normalize=False):
+        """
+        Compute the synchrotron map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
+        
+        Parameters
+        ----------
+        - freq0 (quantity): the frequency at wich we work
+        Has no effect if Normalized is True
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500max (float): the integration will stop at NR500max x R500
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
+
+        Outputs
+        ----------
+        synchrotron_map (np.ndarray) : the map in units of sr-1 or brightness
+
+        """
+
+        # Get the header
+        header = self.get_map_header()
+
+        # Get a R.A-Dec. map
+        ra_map, dec_map = map_tools.get_radec_map(header)
+
+        # Get a cluster distance map (in deg)
+        dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
+        
+        # Define the radius used fo computing the profile
+        theta_max = np.amax(dist_map) # maximum angle from the cluster
+        theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+        
+        # Project the integrand
+        r_proj, profile = self.get_synchrotron_profile(radius, freq0=freq0, 
+                                                       Rmin_los=Rmin_los, NR500max=NR500max)
+
+        # Convert to angle and interpolate onto a map
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
+        synchrotron_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
+        
+        # Avoid numerical residual ringing from interpolation
+        synchrotron_map[dist_map > self._theta_truncation.to_value('deg')] = 0
+        
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500max*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_synchrotron_flux(Rmin=Rmin, Rmax=Rmax, type_integral='spherical', NR500max=NR500max, freq0=freq0)
+            synchrotron_map = synchrotron_map / flux
+            synchrotron_map = synchrotron_map.to('sr-1')
+
+        else:
+            synchrotron_map = synchrotron_map.to('Jy sr-1')
+                
+        return synchrotron_map
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    #==========================================================================================================================
+    #==========================================================================================================================
+    #==========================================================================================================================
 
     
     #==================================================

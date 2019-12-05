@@ -98,9 +98,9 @@ class Physics(object):
     compute the cosmic ray electron density profile integrating over the energy between Emin and Emax.
     - get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None): compute the cosmic ray electron
     spectrum integrating over the volume up to Rmax
-    - get_synchrotron_rate(self, frequency=np.logspace(-3,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc):
+    - get_rate_synchrotron(self, frequency=np.logspace(-3,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc):
     compute the synchrotron emission per unit volume given the electron population and magnetic field
-    - get_ic_rate(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    - get_rate_ic(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the inverse compton emission per unit volume given the electron population and CMB(z)
 
     """
@@ -1035,7 +1035,7 @@ class Physics(object):
             dN_dEdVdt2 = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
             dN_dEdVdt = dN_dEdVdt1 + dN_dEdVdt2
             
-        elif flavor == 'munu':
+        elif flavor == 'numu':
             dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
             
         elif flavor == 'nue':
@@ -1196,13 +1196,13 @@ class Physics(object):
     # Get the synchrotron spectrum
     #==================================================
     
-    def get_synchrotron_rate(self, energy=np.logspace(-9,-2,100)*u.eV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_synchrotron(self, energy=np.logspace(-9,-2,100)*u.eV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the synchrotron density as dN/dEdVdt = f(E, r)
         
         Parameters
         ----------
-        - frequency (quantity) : the physical frequency of synchrotron photons
+        - energy (quantity) : the physical energy of synchrotron photons
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
 
         Outputs
@@ -1212,7 +1212,7 @@ class Physics(object):
         """
 
         # In case the input is not an array
-        frequency = model_tools.check_qarray(frequency, unit='GHz')
+        energy = model_tools.check_qarray(energy, unit='eV')
         radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Get the magnetic field
@@ -1237,7 +1237,7 @@ class Physics(object):
     # Get the IC spectrum
     #==================================================
     
-    def get_ic_rate(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_ic(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the inverse compton density as dN/dEdVdt = f(E, r)
         

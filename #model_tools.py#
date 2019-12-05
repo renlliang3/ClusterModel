@@ -189,7 +189,6 @@ def trapz_loglog(y, x, axis=-1, intervals=False):
     return ret
 
 
-
 #==================================================
 # Compute spectrum integration
 #==================================================

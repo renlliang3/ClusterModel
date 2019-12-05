@@ -43,6 +43,9 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     To do list
     ----------  
     - Compute observables associated to all quantities
+    - Account for K-correction in spectra
+    - Remove loop in eletron emission rate
+    - Check Klein Nishina effect which reduces IC at high energy
     
     Attributes
     ----------  
