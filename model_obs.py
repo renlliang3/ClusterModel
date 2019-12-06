@@ -1235,7 +1235,7 @@ class Observables(object):
         
         Parameters
         ----------
-        - energy (quantity) : the physical enery of photons
+        - frequency (quantity) : the physical frequency of photons
         - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
         (default is 1kpc, R500)
         - type_integral (string): either 'spherical' or 'cylindrical'
@@ -1247,7 +1247,7 @@ class Observables(object):
         Outputs
         ----------
         - frequency (quantity) : the physical energy of photons
-        - dN_dEdSdt (np.ndarray) : the spectrum in units of Jy
+        - dE_dtdfdS (np.ndarray) : the spectrum in units of Jy
 
         """
         
@@ -1309,7 +1309,7 @@ class Observables(object):
 
         Outputs
         ----------
-        - dN_dSdtdO (np.ndarray) : the spectrum in units of cm-2 s-1 sr-1 or GeV cm-2 s-1 sr-1
+        - sed (np.ndarray) : the spectrum in units of Jy/sr
 
         """
         
@@ -1517,109 +1517,104 @@ class Observables(object):
                 
         return synchrotron_map
 
-
-
-    #==========================================================================================================================
-    #==========================================================================================================================
-    #==========================================================================================================================
-
     
     #==================================================
-    # Compute Ysph
+    # Compute SZ spectrum
     #==================================================
 
-    def get_ysph_profile(self, radius=np.logspace(0,4,1000)*u.kpc):
+    def get_sz_spectrum(self, frequency=np.logspace(1,3,100)*u.GHz, Compton_only=False, 
+                        Rmin=None, Rmax=None,
+                        type_integral='spherical',
+                        Rmin_los=None, NR500_los=5.0):
         """
-        Get the spherically integrated Compton parameter profile.
+        Compute the SZ emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the SZ emmission enclosed within a circular area (i.e.
+        cylindrical).
         
         Parameters
         ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - frequency (quantity) : the physical frequency of photons
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - Rmin_los (quantity): minimal radius at which l.o.s integration starts
+        This is used only for cylindrical case
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        This is used only for cylindrical case
 
         Outputs
         ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Ysph_r (quantity): the integrated Compton parameter (homogeneous to kpc^2)
-
+        - frequency (quantity) : the physical energy of photons
+        - dE_dtdfdS (np.ndarray) : the spectrum in units of Jy
+        
         """
-
+        
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        frequency = model_tools.check_qarray(frequency, unit='GHz')
 
-        #---------- Define radius associated to the pressure
-        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+            
+        # Compute the integral
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dE_dtdVdfdO_f = self.get_rate_sz(frequency, rad, Compton_only=Compton_only)
+            dE_dtdfdO_f = model_tools.spherical_integration(dE_dtdVdf, rad)
+            
+        # Compute the integral        
+        if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)
+            Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
+            r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            dE_dtdVdfdO_f = self.get_rate_sz(frequency, r3d, Compton_only=Compton_only)
+            dE_dtdfdO_f = model_tools.cylindrical_integration(dE_dtdVdfdO_f, frequency, r3d, r2d, los, Rtrunc=self._R_truncation)
         
-        #---------- Get the density profile
-        rad, p_r = self.get_pressure_gas_profile(radius=press_radius)
-
-        #---------- Integrate the pressure in 3d
-        I_p_gas_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            I_p_gas_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), p_r.to_value('keV cm-3'),
-                                                                radius.to_value('kpc')[i], Npt=1000)
-        
-        Ysph_r = const.sigma_T/(const.m_e*const.c**2) * I_p_gas_r*u.Unit('keV cm-3 kpc3')
-
-        return radius, Ysph_r.to('kpc2')
-
-
-    #==================================================
-    # Compute Ycyl
-    #==================================================
-
-    def get_ycyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500_los=5.0, Npt_los=100):
-        """
-        Get the integrated cylindrical Compton parameter profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
-        
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Ycyl_r : the integrated Compton parameter
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        #---------- Define radius associated to the Compton parameter
-        y_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the Compton parameter profile
-        r2d, y_r = self.get_y_compton_profile(y_radius, NR500_los=NR500_los, Npt_los=Npt_los)
-
-        #---------- Integrate the Compton parameter in 2d
-        Ycyl_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            Ycyl_r[i] = cluster_profile.get_surface_any_model(r2d.to_value('kpc'), y_r.to_value('adu'),
-                                                              radius.to_value('kpc')[i], Npt=1000)
-        
-        return radius, Ycyl_r*u.Unit('kpc2')
+        # return
+        if Compton_only:
+            output = dE_dtdfdO_f.to('kpc2')
+        else:
+            dE_dtdf_f = dE_dtdfdO_f / self._D_ang**2 * u.sr # This is because for SZ we want \int S_SZ dOmega, not \int S_SZ dS
+            output = dE_dtdf_f.to('Jy')
+                        
+        return frequency, output
 
     
     #==================================================
-    # Compute y profile
+    # Compute SZ profile
     #==================================================
-    
-    def get_y_compton_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500_los=5.0, Npt_los=100):
+
+    def get_sz_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                       freq0=100*u.GHz, Compton_only=False, 
+                       Rmin_los=None, NR500_los=5.0):
         """
-        Get the Compton parameter profile.
+        Get the SZ parameter profile.
         
         Parameters
         ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
-        
+        - radius (quantity): the physical 2d radius in units homogeneous to kpc, as a 1d array
+        - freq0 (quantity): the frequency at which the profile is computed.
+        - Compton (bool): if set to true, return the Compton-y parameter.
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        - Compton_only (bool): Output the Compton parameter instead of the spectrum. In the case of
+        Compton only, the frequency input does not matter 
+
         Outputs
         ----------
-        - Rproj (quantity): the projected 2d radius in unit of kpc
-        - y_r : the Compton parameter
+        - radius (quantity): the projected 2d radius in unit of kpc
+        - output : the Compton parameter or brightness profile
 
         Note
         ----------
@@ -1628,107 +1623,234 @@ class Observables(object):
         """
         
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        # Define radius associated to the pressure
-        p_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
-                                                            Rmin=1.0, Rmax=NR500_los*self._R500.to_value('kpc'),
-                                                            Nptmin=1000)*u.kpc
+        radius = model_tools.check_qarray(radius, unit='kpc')
         
-        # Get the pressure profile
-        rad3d, p_r = self.get_pressure_gas_profile(radius=p_radius)
+        # Get the integration limits
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
 
-        # Project it
-        Rmax = np.amax(NR500_los*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
-        Rpmax = np.amax(radius.to_value('kpc'))              # Max radius to which we get the profile
-        Rproj, Pproj = cluster_profile.proj_any_model(rad3d.to_value('kpc'), p_r.to_value('keV cm-3'),
-                                                      Npt=Npt_los, Rmax=Rmax, Rpmax=Rpmax, Rp_input=radius.to_value('kpc'))
+        # Define array for integration
+        Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
+        Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
+        r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dE_dtdVdfdO_f = self.get_rate_sz(freq0, r3d, Compton_only=Compton_only).flatten() 
+
+        # Compute integral over l.o.s.
+        dE_dtdSdfdO_f = model_tools.los_integration_1dfunc(dE_dtdVdfdO_f, r3d, radius, los)
+        dE_dtdSdfdO_f[radius > self._R_truncation] = 0
         
-        # Get the Compton parameter
-        Rproj *= u.kpc
-        y_compton = Pproj*u.Unit('keV cm-3 kpc') * const.sigma_T/(const.m_e*const.c**2)
+        # return
+        if Compton_only:
+            output = dE_dtdSdfdO_f.to_value('')*u.adu
+        else:
+            output = dE_dtdSdfdO_f.to('Jy sr-1')
 
-
-        # Apply truncation in case
-        y_compton[Rproj > self._R_truncation] = 0.0
-        
-        return Rproj.to('kpc'), y_compton.to_value('')*u.adu
-
+        return radius, output
     
+
     #==================================================
-    # Compute y map 
+    # Compute SZ flux
     #==================================================
     
-    def get_ymap(self, FWHM=None, NR500_los=5.0, Npt_los=100):
+    def get_sz_flux(self, freq0=100*u.GHz, Compton_only=False,
+                    Rmin=None, Rmax=None,
+                    type_integral='spherical',
+                    Rmin_los=None, NR500_los=5.0):
+        
         """
-        Compute a Compton parameter ymap.
+        Compute the SZ emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the SZ emmission enclosed within a circular area (i.e.
+        cylindrical), and at a given frequency (or in Compton unit). The 
+        radius max can be an array to get flux(<R).
         
         Parameters
         ----------
-        - FWHM (quantity) : the beam smoothing FWHM (homogeneous to deg)
-        - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
+        - freq0 (quantity): the frequency at which the profile is computed
+        - Compton_only (bool): Output the Compton parameter instead of the spectrum. In the case of
+        Compton only, the frequency input does not matter 
+        - Rmin (quantity): the minimal radius within with the spectrum is computed 
+        - Rmax (quantity): the maximal radius within with the spectrum is computed.
+        It can be an array.
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - Rmin_los (quantity): minimal radius at which l.o.s integration starts
+        This is used only for cylindrical case
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        This is used only for cylindrical case
 
         Outputs
         ----------
-        - ymap (adu) : the Compton parameter map
+        - flux (quantity) : the synchrotron flux in Jy or kpc^2 (for Compton)
 
         """
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
         
+        #----- Case of scalar quantities
+        if type(Rmax.value) == float:
+                freq0, flux = self.get_sz_spectrum(freq0, Compton_only=Compton_only, Rmin=Rmin, Rmax=Rmax,
+                                                   type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los)
+        
+        #----- Case of radius array (need to use dN/dVdEdt and not get_profile because spherical flux)
+        if type(Rmax.value) == np.ndarray:
+            # Get frequency sampling
+            if type_integral == 'spherical':
+                Rmax3d = np.amax(Rmax.value)*Rmax.unit
+                Rmin3d = Rmin
+            if type_integral == 'cylindrical':
+                Rmax3d = np.sqrt((NR500_los*self._R500)**2 + (np.amax(Rmax.value)*Rmax.unit)**2)*1.1        
+                Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
+            r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            dE_dtdVdfdO_f = self.get_rate_sz(freq0, r3d, Compton_only=Compton_only).flatten()
+
+            # Define output
+            if Compton_only:
+                flux = np.zeros(len(Rmax))*u.Unit('kpc2')
+            else:
+                flux = np.zeros(len(Rmax))*u.Unit('Jy')
+
+            # Case of spherical integral: direct volume integration
+            itpl = interpolate.interp1d(r3d.to_value('kpc'), dE_dtdVdfdO_f.value, kind='cubic')
+            if type_integral == 'spherical':
+               for i in range(len(Rmax)):
+                   rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
+                   dE_dtdVdfdO_f_i = itpl(rad_i.to_value('kpc'))*dE_dtdVdfdO_f.unit
+                   if Compton_only:
+                       flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i)
+                   else:
+                       flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i) / self._D_ang**2*u.sr
+                
+            # Case of cylindrical integral
+            if type_integral == 'cylindrical':
+                # Compute integral over l.o.s.
+                radius = model_tools.sampling_array(Rmin, np.amax(Rmax.value)*Rmax.unit, NptPd=self._Npt_per_decade_integ, unit=True)
+                dE_dtdVdfdO_f_proj = model_tools.los_integration_1dfunc(dE_dtdVdfdO_f, r3d, radius, los)
+                dE_dtdVdfdO_f_proj[radius > self._R_truncation] = 0
+        
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dE_dtdVdfdO_f_proj.value, kind='cubic')
+                
+                for i in range(len(Rmax)):
+                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
+                    dE_dtdVdfdO_f_proj_i = itpl(rad_i.value)*dE_dtdVdfdO_f_proj.unit
+                    if Compton_only:
+                        flux[i] = model_tools.trapz_loglog(2*np.pi*rad_i*dE_dtdVdfdO_f_proj_i, rad_i)
+                    else:
+                        flux[i] = model_tools.trapz_loglog(2*np.pi*rad_i*dE_dtdVdfdO_f_proj_i, rad_i) / self._D_ang**2*u.sr
+
+        # output
+        if Compton_only:
+            output = flux.to('kpc2')
+        else:
+            output = flux.to('Jy')
+                       
+        return output
+
+
+    #==================================================
+    # Compute SZ map
+    #==================================================
+    def get_sz_map(self, freq0=100*u.GHz, Compton_only=False,
+                   Rmin_los=None, NR500_los=5.0,
+                   Rmin=None, Rmax=None,
+                   Normalize=False):
+        """
+        Compute the SZ map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
+        
+        Parameters
+        ----------
+        - freq0 (quantity): the frequency at wich we work
+        Has no effect if Normalized is True
+        - Compton_only (bool): Output the Compton parameter instead of the spectrum. In the case of
+        Compton only, the frequency input does not matter 
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500_los (float): the integration will stop at NR500_los x R500
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
+
+        Outputs
+        ----------
+        sz_map (np.ndarray) : the map in units of sr-1 or brightness, or Compton
+
+        """
+
         # Get the header
         header = self.get_map_header()
-        w = WCS(header)
-        if w.wcs.has_cd():
-            if w.wcs.cd[1,0] != 0 or w.wcs.cd[0,1] != 0:
-                print('!!! WARNING: R.A and Dec. is rotated wrt x and y. The extracted resolution was not checked in such situation.')
-            map_reso_x = np.sqrt(w.wcs.cd[0,0]**2 + w.wcs.cd[1,0]**2)
-            map_reso_y = np.sqrt(w.wcs.cd[1,1]**2 + w.wcs.cd[0,1]**2)
-        else:
-            map_reso_x = np.abs(w.wcs.cdelt[0])
-            map_reso_y = np.abs(w.wcs.cdelt[1])
-        
+
         # Get a R.A-Dec. map
         ra_map, dec_map = map_tools.get_radec_map(header)
 
-        # Get a cluster distance map
+        # Get a cluster distance map (in deg)
         dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
-
-        # Define the radius used fo computing the Compton parameter profile
+        
+        # Define the radius used fo computing the profile
         theta_max = np.amax(dist_map) # maximum angle from the cluster
         theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
-        if theta_min == 0:
-            theta_min = 1e-4 # Zero will cause bug, put <1arcsec in this case
-        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
-        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
-        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
-
-        # Compute the Compton parameter projected profile
-        r_proj, y_profile = self.get_y_compton_profile(radius, NR500_los=NR500_los, Npt_los=Npt_los) # kpc, [y]
-        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                                 # degrees
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
-        # Interpolate the profile onto the map
-        ymap = map_tools.profile2map(y_profile.to_value('adu'), theta_proj, dist_map)
+        # Project the integrand
+        r_proj, profile = self.get_sz_profile(radius, freq0=freq0, Compton_only=Compton_only,
+                                              Rmin_los=Rmin_los, NR500_los=NR500_los)
+
+        # Convert to angle and interpolate onto a map
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
+        sz_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
         
         # Avoid numerical residual ringing from interpolation
-        ymap[dist_map > self._theta_truncation.to_value('deg')] = 0
+        sz_map[dist_map > self._theta_truncation.to_value('deg')] = 0
         
-        # Smooth the ymap if needed
-        if FWHM != None:
-            FWHM2sigma = 1.0/(2.0*np.sqrt(2*np.log(2)))
-            ymap = ndimage.gaussian_filter(ymap, sigma=(FWHM2sigma*FWHM.to_value('deg')/map_reso_x,
-                                                        FWHM2sigma*FWHM.to_value('deg')/map_reso_y), order=0)
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500_los*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_sz_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los,
+                                    freq0=freq0, Compton_only=Compton_only)
+            if Compton_only:
+                sz_map = sz_map.to_value('adu') / (flux/self._D_ang**2*u.sr)
+                sz_map = sz_map.to('sr-1')
+            else:
+                sz_map = sz_map / flux
+                sz_map = sz_map.to('sr-1')
+        else:
+            if Compton_only:
+                sz_map = sz_map.to('adu')
+            else:
+                sz_map = sz_map.to('Jy sr-1')
+                
+        return sz_map
 
-        return ymap*u.adu
 
 
 
-
-
-
-
-
-
-
+    #==========================================================================================================================
+    #==========================================================================================================================
+    #==========================================================================================================================
     
     #==================================================
     # Compute a Xspec table versus temperature
