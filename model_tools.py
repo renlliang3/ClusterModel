@@ -189,7 +189,6 @@ def trapz_loglog(y, x, axis=-1, intervals=False):
     return ret
 
 
-
 #==================================================
 # Compute spectrum integration
 #==================================================
@@ -215,10 +214,10 @@ def energy_integration(func, energy, Energy_density=False):
         if func.ndim == 1:
             I_func = trapz_loglog(energy*func, energy, axis=0, intervals=False)
         elif func.ndim == 2:
-            I_func = trapz_loglog(np.vstack(energy)*func, energy, axis=0, intervals=False)
+            I_func = trapz_loglog(np.vstack(energy.value)*energy.unit*func, energy, axis=0, intervals=False)
     else:        
         I_func = trapz_loglog(func, energy, axis=0, intervals=False)
-
+        
     return I_func
 
 
@@ -226,14 +225,14 @@ def energy_integration(func, energy, Energy_density=False):
 # Compute spherical integration
 #==================================================
 
-def spherical_integration_2dfunc(dN_dEdVdt, radius):
+def spherical_integration(func, radius):
     """
     Integrate over the spherical volume to get the spectrum:
     \int_Rmin^Rmax 4 pi r^2 dN_dEdVdt(E,r) dr
     
     Parameters
     ----------
-    - dN_dEdVdt (2d array): Input array to integrate.
+    - dN_dEdVdt (1d/2d array): Input array to integrate.
     - radius (array): Radius variable to integrate over.
     
     Returns
@@ -241,17 +240,19 @@ def spherical_integration_2dfunc(dN_dEdVdt, radius):
     - dN_dEdt (array): integrated quantity
 
     """
-
-    dN_dEdt = trapz_loglog(4*np.pi*radius**2*dN_dEdVdt, radius, axis=1, intervals=False)
-
-    return dN_dEdt
+    if func.ndim == 1:
+        I = trapz_loglog(4*np.pi*radius**2*func, radius, axis=0, intervals=False)
+    elif func.ndim == 2:
+        I = trapz_loglog(4*np.pi*radius**2*func, radius, axis=1, intervals=False)
+        
+    return I
 
 
 #==================================================
 # Compute cylindrical integration
 #==================================================
 
-def cylindrical_integration_2dfunc(dN_dEdVdt, eng, r3d, r2d, los, Rtrunc=None):
+def cylindrical_integration(dN_dEdVdt, eng, r3d, r2d, los, Rtrunc=None):
     """
     Integrate over the spherical cylindrical volume to get the spectrum:
     \int_Rmin^Rmax 2 pi r dr \int_Rmin^Rmax dN_dEdVdt(E,r) dl
@@ -269,16 +270,41 @@ def cylindrical_integration_2dfunc(dN_dEdVdt, eng, r3d, r2d, los, Rtrunc=None):
 
     """
 
-    # First compute the los integral assuming a 2d function to get: f(E, r2d)
-    dN_dEdVdt_proj = los_integration_2dfunc(dN_dEdVdt, eng, r3d, r2d, los)
+    # We need real 2 d array for los_integration_2dfunc, check this
+    was2d = False
+    if dN_dEdVdt.ndim == 2:
+        if len(dN_dEdVdt[:,0]) == 1:
+            dN_dEdVdt = dN_dEdVdt.flatten()
+            was2d = True
 
-    # In case of a truncation, some ringing can happen with interpolation, deal with this
-    if Rtrunc is not None:
-        rgrid = replicate_array(r2d, len(eng), T=False)
-        dN_dEdVdt_proj[rgrid > Rtrunc] = 0
+    # Case of 2d array
+    if dN_dEdVdt.ndim == 2:
+        # First compute the los integral assuming a 2d function to get: f(E, r2d)
+        dN_dEdVdt_proj = los_integration_2dfunc(dN_dEdVdt, eng, r3d, r2d, los)
+        
+        # In case of a truncation, some ringing can happen with interpolation, deal with this
+        if Rtrunc is not None:
+            rgrid = replicate_array(r2d, len(eng), T=False)
+            dN_dEdVdt_proj[rgrid > Rtrunc] = 0
+            
+        # Then integrate over the surface
+        dN_dEdt = trapz_loglog(2*np.pi*r2d*dN_dEdVdt_proj, r2d, axis=1, intervals=False)
 
-    # Then integrate over the surface
-    dN_dEdt = trapz_loglog(2*np.pi*r2d*dN_dEdVdt_proj, r2d, axis=1, intervals=False)
+    # Case of 1d array
+    if dN_dEdVdt.ndim == 1:
+        # First compute the los integral assuming a 1d function to get: f(r2d) at E_0
+        dN_dEdVdt_proj = los_integration_1dfunc(dN_dEdVdt, r3d, r2d, los)
+
+        # In case of a truncation, some ringing can happen with interpolation, deal with this
+        if Rtrunc is not None:
+            dN_dEdVdt_proj[r2d > Rtrunc] = 0
+            
+        # Then integrate over the surface
+        dN_dEdt = trapz_loglog(2*np.pi*r2d*dN_dEdVdt_proj, r2d, axis=0, intervals=False)
+
+        # Make it a 1 D array in case of dim = [1, Nrad]
+        if was2d:
+            dN_dEdt = np.array([dN_dEdt.value])*dN_dEdt.unit
 
     return dN_dEdt
 
