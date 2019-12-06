@@ -25,8 +25,6 @@ from ClusterTools import cluster_xspec
 from ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
 from ClusterTools import cluster_electron_loss
 from ClusterTools import cluster_electron_emission
-
-import naima
     
 
 #==================================================
@@ -1043,7 +1041,6 @@ class Physics(object):
             
         else :
             raise ValueError('Only all, numu and nue flavor are available.')    
-
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 

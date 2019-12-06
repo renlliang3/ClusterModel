@@ -42,10 +42,12 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Validate/rewrite SZ and Xray observable
+    - Validate/rewrite Xray observable
     - Account for K-correction in spectra
-    - Split in subclasses?
+    - Account for SZ relativistic corrections
     - Check Klein Nishina effect which reduces IC at high energy
+    - Split in subclasses
+    - Add extra primary electron population
     
     Attributes
     ----------  
