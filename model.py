@@ -43,7 +43,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     To do list
     ----------  
     - Validate/rewrite SZ and Xray observable
-    - Remove loop in eletron emission rate
     - Account for K-correction in spectra
     - Split in subclasses?
     - Check Klein Nishina effect which reduces IC at high energy
