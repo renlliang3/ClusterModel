@@ -1229,7 +1229,7 @@ class Physics(object):
         
         # Extract the spectrum: what is long is evaluating Je inside the code
         dN_dEdVdt = model.synchrotron(energy, radius_input=radius, B=B).T
-                
+        
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
 
@@ -1243,7 +1243,7 @@ class Physics(object):
         
         Parameters
         ----------
-        - energy (quantity) : the physical energy of electrons
+        - energy (quantity) : the physical energy of photons
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
 
         Outputs
@@ -1269,4 +1269,52 @@ class Physics(object):
         dN_dEdVdt = model.inverse_compton(energy, radius_input=radius, redshift=self._redshift).T
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
+
+
+    #==================================================
+    # Get the SZ rate
+    #==================================================
+    
+    def get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc, Compton_only=False):
+        """
+        Compute the SZ emission per unit volume, or the Compton parameter per unit distance.
+        
+        Parameters
+        ----------
+        - frequency (quantity) : the physical frequency of photons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - Compton_only (bool): Output the Compton parameter instead of the spectrum. In the case of
+        Compton only, with relativistic correction, y is weighted by the ratio f(nu,T)/f(nu,0)
+
+        Outputs
+        ----------
+        - dE_dtdVdfdO (np.ndarray): the differntial production rate
+
+        """
+
+        # In case the input is not an array
+        frequency = model_tools.check_qarray(frequency, unit='GHz')
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Get the pressure and temperature profile
+        radius, temperature = self.get_temperature_gas_profile(radius)
+        radius, pressure    = self.get_pressure_gas_profile(radius)
+
+        # Get the SZ spectrum
+        x = const.h * frequency / (const.k_B * self._cosmo.Tcmb0)
+        f_nu = x**4 * np.exp(x) / (np.exp(x)-1)**2 * (x*(np.exp(x)+1)/(np.exp(x)-1) - 4)
+        I0 = 2*(const.k_B*self._cosmo.Tcmb0)**3/(const.h*const.c)**2*u.sr**-1
+        dI = I0*f_nu
+        
+        # Get SZ power per unit volume and frequency
+        if Compton_only:
+            compton =  model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            output = compton.to('kpc-1')
+        else:
+            spatial = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            spectral = model_tools.replicate_array(dI, len(radius), T=True)
+            dE_dtdVdfdO = spatial * spectral
+            output = dE_dtdVdfdO.to('eV s-1 cm-3 Hz-1 sr-1')
+            
+        return output
 
