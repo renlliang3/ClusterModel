@@ -42,10 +42,8 @@ class Physics(object):
 
     Methods
     ----------  
-    - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
-    nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
-    when getting profiles and maps
-    - itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
+
+    * Methods related to the physical description of the cluster
 
     - get_pressure_gas_profile(self, radius=np.logspace(1,5,1000)*u.kpc): compute the electron
     gas pressure profile.
@@ -66,7 +64,7 @@ class Physics(object):
     - get_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc): compute the thermal
     energy profile
     - get_magfield_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the magnetic field profile
-    
+
     - get_normed_density_crp_profile(self, radius=np.logspace(0,4,1000)*u.kpc): get the radial 
     part of the cosmic ray protons distribution, f(r), in dN/dEdV = A f(r) f(E)
     - get_normed_crp_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV): get the spectral part
@@ -82,6 +80,9 @@ class Physics(object):
     spectrum integrating over the volume up to Rmax
     - get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
     compute the cosmic ray proton energy (between Emin and Emax) to thermal energy profile.
+    
+    
+    * Methods related to the physical processes in the cluster
 
     - get_rate_gamma_ray(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the gamma ray emission rate dN/dEdVdt versus energy and radius
@@ -101,145 +102,17 @@ class Physics(object):
     - get_rate_ic(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the inverse compton emission per unit volume given the electron population and CMB(z)
 
+    - get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc, Compton_only=False):
+    Compute the SZ emission per cm3
+
+    - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
+    nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
+    when getting profiles and maps
+    - itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
+    - get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc, output_type='C'): compute
+    the X-ray emission per unit volume
+
     """
-    
-    #==================================================
-    # Compute a Xspec table versus temperature
-    #==================================================
-    
-    def make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,
-                         Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
-                         nH=0.0/u.cm**2, file_HI=None, visu_nH=False,
-                         model='APEC',
-                         resp_file=None, data_file=None, app_nH_model=False,
-                         Kcor=False):
-        """
-        Generate an xspec table as a function of temperature, for the cluster.
-        This require xspec to be installed, and having a hydrogen column density 
-        map in the Healpix format.
-        
-        Parameters
-        ----------
-        - Emin (quantity): Xray band minimal energy (RASS Hard is 0.5-2.4 keV, RASS Soft is 0.1-0.4 keV)
-        - Emax (quantity): Xray band maximal energy
-        - Tmin (quantity): min table temperature (in keV)
-        - Tmax (quantity): max table temperature (in keV)
-        - nbin (int): number of temperature point in the table (in unit of cm^-2, not 10^22 cm^-2)
-        - nH (quantity): H I column density at the cluster
-        - file_HI (str): full path to the map file
-        - visu_nH (bool): show the nH maps and histogram when extracted from data
-        - model (str): which model to use (APEC or MEKAL)
-        - resp_file (str): full path to the response file of e.g., ROSAT PSPC
-        - data_file (str): full path to any data spectrum file needed for template in xspec 
-        (see https://heasarc.gsfc.nasa.gov/FTP/rosat/doc/xselect_guide/xselect_guide_v1.1.1/xselect_ftools.pdf,
-        section 5)
-        - app_nH_model (bool): apply nH absorbtion to the initial model without instrumental effects
-        - Kcor (bool): shift the energy by 1+z to go to the cluster frame
-
-        Outputs
-        ----------
-        XSPEC table created in the output directory
-
-        """
-        
-        # Create the output directory if needed
-        if not os.path.exists(self._output_dir): os.mkdir(self._output_dir)
-        
-        # In case we want nH from real data at cluster location
-        if file_HI != None :
-            # Make sure the FoV and resolution are ok
-            if self._map_fov == None or self._map_reso == None:
-                fov = 1.0
-                reso = 0.1
-            else:
-                fov = self._map_fov.to_value('deg')
-                reso = self._map_reso.to_value('deg')
-                
-            nH2use, nH2use_err = cluster_xspec.get_nH(file_HI,
-                                                      self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'),
-                                                      fov=fov, reso=reso,
-                                                      save_file=None, visu=visu_nH)
-            if nH2use/nH2use_err < 5 :
-                print('!!! WARNING, nH is not well constain in the field (S/N < 5) and nH='+str(nH2use)+' 10^22 cm-2.')
-
-        # Or give nH directly
-        elif nH != None:
-            nH2use = 10**-22 * nH.to_value('cm-2')
-        else:
-            raise ValueError("nH or file_HI should be provided to get the hydrogen column density.")
-            
-        # Compute the table
-        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table.txt', nH2use, self._abundance, self._redshift,
-                                       Emin.to_value('keV'), Emax.to_value('keV'), 
-                                       Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
-                                       Kcor=Kcor,
-                                       file_ana=self._output_dir+'/xspec_analysis.txt',
-                                       file_out=self._output_dir+'/xspec_analysis_output.txt',
-                                       model=model,
-                                       resp_file=resp_file, data_file=data_file, app_nH_model=app_nH_model,
-                                       cleanup=True,
-                                       logspace=True)
-
-
-    #==================================================
-    # Read and interpolate xspec tables
-    #==================================================
-    
-    def itpl_xspec_table(self, xspecfile, Tinput):
-        """
-        Read an Xspec table and interpolate values at a given temperature
-
-        Parameters
-        ----------
-        - xspecfile (str): full path to Xspec file to read
-
-        Outputs
-        ----------
-        - dC (quantity): the interpolated differential counts
-        - dS (quantity): the interpolated differential surface brightness counts
-        - dR (quantity): the interpolated differential rate
-
-        """
-        
-        file_start = 3
-        
-        # Read the temperature
-        with open(xspecfile) as f: 
-            col = zip(*[line.split() for line in f])[0]
-            Txspec = np.array(col[file_start:]).astype(np.float)
-
-        # Read Xspec counts
-        with open(xspecfile) as f: 
-            col = zip(*[line.split() for line in f])[1]
-            Cxspec = np.array(col[file_start:]).astype(np.float)
-
-        # Read Xspec surface brightness
-        with open(xspecfile) as f: 
-            col = zip(*[line.split() for line in f])[2]
-            Sxspec = np.array(col[file_start:]).astype(np.float)
-
-        # Read Xspec rate
-        with open(xspecfile) as f: 
-            col = zip(*[line.split() for line in f])[3]
-            Rxspec = np.array(col[file_start:]).astype(np.float)
-        
-        # Define interpolation and set unit
-        Citpl = interpolate.interp1d(Txspec, Cxspec, kind='cubic', fill_value='extrapolate')
-        Sitpl = interpolate.interp1d(Txspec, Sxspec, kind='cubic', fill_value='extrapolate')
-        Ritpl = interpolate.interp1d(Txspec, Rxspec, kind='cubic', fill_value='extrapolate')
-        
-        dCxspec = Citpl(Tinput.to_value('keV')) * 1/u.cm**2/u.s/u.cm**-5
-        dSxspec = Sitpl(Tinput.to_value('keV')) * u.erg/u.cm**2/u.s/u.cm**-5
-        dRxspec = Ritpl(Tinput.to_value('keV')) * 1/u.s/u.cm**-5
-        
-        # Take care of undefined temperature (i.e. no gas)
-        dCxspec[np.isnan(Tinput.to_value('keV'))] = 0.0            
-        dSxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
-        dRxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
-        if np.sum(~np.isnan(dRxspec)) == 0 :
-            dRxspec[:] = np.nan
-        
-        return dCxspec, dSxspec, dRxspec
 
     
     #==================================================
@@ -1313,5 +1186,207 @@ class Physics(object):
             dE_dtdVdfdO = spatial * spectral
             output = dE_dtdVdfdO.to('eV s-1 cm-3 Hz-1 sr-1')
             
+        return output
+
+
+    #==================================================
+    # Compute a Xspec table versus temperature
+    #==================================================
+    
+    def make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,
+                         Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
+                         nH=0.0/u.cm**2, file_HI=None, visu_nH=False,
+                         model='APEC',
+                         resp_file=None, data_file=None, app_nH_model=False,
+                         Kcor=False):
+        """
+        Generate an xspec table as a function of temperature, for the cluster.
+        This require xspec to be installed.
+        It requires having a hydrogen column density map in the Healpix format 
+        if nH should be read from a map. 
+        Instrumental response files are needed for computing count rates (in ph/s)
+        
+        Parameters
+        ----------
+        - Emin (quantity): Xray band minimal energy (RASS Hard is 0.5-2.4 keV, RASS Soft is 0.1-0.4 keV)
+        - Emax (quantity): Xray band maximal energy
+        - Tmin (quantity): min table temperature (in keV)
+        - Tmax (quantity): max table temperature (in keV)
+        - nbin (int): number of temperature point in the table (in unit of cm^-2, not 10^22 cm^-2)
+        - nH (quantity): H I column density at the cluster
+        - file_HI (str): full path to the map file
+        - visu_nH (bool): show the nH maps and histogram when extracted from data
+        - model (str): which model to use (APEC or MEKAL)
+        - resp_file (str): full path to the response file of e.g., ROSAT PSPC
+        - data_file (str): full path to any data spectrum file needed for template in xspec 
+        (see https://heasarc.gsfc.nasa.gov/FTP/rosat/doc/xselect_guide/xselect_guide_v1.1.1/xselect_ftools.pdf,
+        section 5)
+        - app_nH_model (bool): apply nH absorbtion to the initial model without instrumental effects
+        - Kcor (bool): shift the energy by 1+z to go to the cluster frame
+
+        Outputs
+        ----------
+        XSPEC table created in the output directory
+
+        """
+        
+        # Create the output directory if needed
+        if not os.path.exists(self._output_dir): os.mkdir(self._output_dir)
+        
+        # In case we want nH from real data at cluster location
+        if file_HI != None :
+            # Make sure the FoV and resolution are ok
+            if self._map_fov == None or self._map_reso == None:
+                fov = 1.0
+                reso = 0.1
+            else:
+                fov = self._map_fov.to_value('deg')
+                reso = self._map_reso.to_value('deg')
+                
+            nH2use, nH2use_err = cluster_xspec.get_nH(file_HI,
+                                                      self._coord.icrs.ra.to_value('deg'),
+                                                      self._coord.icrs.dec.to_value('deg'),
+                                                      fov=fov, reso=reso,
+                                                      save_file=None, visu=visu_nH)
+            if nH2use/nH2use_err < 5 :
+                print('!!! WARNING, nH is not well constain in the field (mean/rms < 5) and nH='+str(nH2use)+' 10^22 cm-2.')
+
+        # Or give nH directly
+        elif nH != None:
+            nH2use = 10**-22 * nH.to_value('cm-2')
+
+        # Show error
+        else:
+            raise ValueError("nH or file_HI should be provided to get the hydrogen column density.")
+        
+        # Compute the table
+        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table.txt', nH2use, self._abundance, self._redshift,
+                                       Emin.to_value('keV'), Emax.to_value('keV'), 
+                                       Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
+                                       Kcor=Kcor,
+                                       file_ana=self._output_dir+'/xspec_analysis.txt',
+                                       file_out=self._output_dir+'/xspec_analysis_output.txt',
+                                       model=model,
+                                       resp_file=resp_file, data_file=data_file, app_nH_model=app_nH_model,
+                                       cleanup=True,
+                                       logspace=True)
+
+    
+    #==================================================
+    # Read and interpolate xspec tables
+    #==================================================
+    
+    def itpl_xspec_table(self, xspecfile, Tinput):
+        """
+        Read an Xspec table and interpolate values at a given temperature
+
+        Parameters
+        ----------
+        - xspecfile (str): full path to Xspec file to read
+
+        Outputs
+        ----------
+        - dC (quantity): the interpolated differential counts
+        - dS (quantity): the interpolated differential surface brightness counts
+        - dR (quantity): the interpolated differential rate
+
+        """
+        
+        file_start = 3
+        
+        # Read the temperature
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[0]
+            Txspec = np.array(col[file_start:]).astype(np.float)
+
+        # Read Xspec counts
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[1]
+            Cxspec = np.array(col[file_start:]).astype(np.float)
+
+        # Read Xspec surface brightness
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[2]
+            Sxspec = np.array(col[file_start:]).astype(np.float)
+
+        # Read Xspec rate
+        with open(xspecfile) as f: 
+            col = zip(*[line.split() for line in f])[3]
+            Rxspec = np.array(col[file_start:]).astype(np.float)
+        
+        # Define interpolation and set unit
+        Citpl = interpolate.interp1d(Txspec, Cxspec, kind='cubic', fill_value='extrapolate')
+        Sitpl = interpolate.interp1d(Txspec, Sxspec, kind='cubic', fill_value='extrapolate')
+        Ritpl = interpolate.interp1d(Txspec, Rxspec, kind='cubic', fill_value='extrapolate')
+        
+        dCxspec = Citpl(Tinput.to_value('keV')) * 1/u.cm**2/u.s/u.cm**-5
+        dSxspec = Sitpl(Tinput.to_value('keV')) * u.erg/u.cm**2/u.s/u.cm**-5
+        dRxspec = Ritpl(Tinput.to_value('keV')) * 1/u.s/u.cm**-5
+        
+        # Take care of undefined temperature (i.e. no gas)
+        dCxspec[np.isnan(Tinput.to_value('keV'))] = 0.0            
+        dSxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
+        dRxspec[np.isnan(Tinput.to_value('keV'))] = 0.0
+        if np.sum(~np.isnan(dRxspec)) == 0 :
+            dRxspec[:] = np.nan
+        
+        return dCxspec, dSxspec, dRxspec
+
+    
+    #==================================================
+    # Get the Xray rate
+    #==================================================
+    
+    def get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc, output_type='C'):
+        """
+        Compute the Xray emission per unit volume. An xspec table file is needed as 
+        output_dir+'/XSPEC_table.txt'. The energy band is defined in this file.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - output_type (str): type of output
+        S == energy counts in erg/s/cm^2/sr
+        C == counts in ph/s/cm^2/sr
+        R == count rate in ph/s/sr (accounting for instrumental response)
+
+        Outputs
+        ----------
+        - {dN_dtdV, dE_dtdV, dNdS_dtdV} (np.ndarray): the differential production rate
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Check output type
+        output_list = ['S', 'C', 'R']
+        if output_type not in output_list:
+            raise ValueError("Available output_type are S, C and R.")        
+        
+        # Get the pressure and temperature profile
+        radius, T_g = self.get_temperature_gas_profile(radius)
+        radius, n_e = self.get_density_gas_profile(radius)
+
+        # Interpolate Xspec table at temperature values
+        dC_xspec, dS_xspec, dR_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
+        if np.sum(~np.isnan(dR_xspec)) == 0 and output_type == 'R':
+            msg = ('You ask for an output in ph/s/sr (i.e. including instrumental response), ',
+                   'but the xspec table was generated without response file.')
+            raise ValueError(msg)
+
+        # Get the the Xspec normalization
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+        xspec_norm = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2) * n_e**2*mu_e/mu_p 
+
+        # Compute norm * counts as dN/dtdS/dV and convert do dN/dVdt via D_lum
+        if output_type == 'S':
+            output = (4*np.pi*self._D_lum**2*xspec_norm * dS_xspec).to('erg s-1 cm-3')
+        elif output_type == 'C':
+            output = (4*np.pi*self._D_lum**2*xspec_norm * dC_xspec).to('s-1 cm-3')
+        elif output_type == 'R':
+            output = (4*np.pi*self._D_lum**2*xspec_norm * dR_xspec).to('s-1 cm-3 cm2')
+
         return output
 

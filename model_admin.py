@@ -545,5 +545,5 @@ class Admin(object):
             raise TypeError("A header, or the map_coord & map_reso & map_fov should be defined.")
 
         return header        
-        
-
+    
+    

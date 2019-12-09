@@ -1844,313 +1844,288 @@ class Observables(object):
                 sz_map = sz_map.to('Jy sr-1')
                 
         return sz_map
-
-
-
-
-    #==========================================================================================================================
-    #==========================================================================================================================
-    #==========================================================================================================================
+    
     
     #==================================================
-    # Compute a Xspec table versus temperature
+    # Compute Xray profile
     #==================================================
-    
-    def get_sx_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500_los=5.0, Npt_los=100,
-                       output_type='S'):
+
+    def get_xray_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                         Rmin_los=None, NR500_los=5.0,
+                         output_type='C'):
+        
         """
-        Compute a surface brightness Xray profile. An xspec table file is needed as 
-        output_dir+'/XSPEC_table.txt'.
+        Get the Xray surface brightness profile. An xspec table file is needed as 
+        output_dir+'/XSPEC_table.txt'. The energy band is defined in this file.
         
         Parameters
         ----------
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
-        - output_type (str): type of ooutput to provide: 
+        - radius (quantity): the physical 2d radius in units homogeneous to kpc, as a 1d array
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        - output_type (str): type of output
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
-        
+
         Outputs
         ----------
-        - Rproj (quantity): the projected 2d radius in unit of kpc
-        - Sx (quantity): the Xray surface brightness projectes profile
+        - radius (quantity): the projected 2d radius in unit of kpc
+        - output : the brightness profile, depending on output_type
 
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        # Get the gas density profile
-        n_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'),
-                                                            Rmin=1.0, Rmax=NR500_los*self._R500.to_value('kpc'),
-                                                            Nptmin=1000)*u.kpc
-
-        # Get the density and temperature profile
-        rad3d, n_e  = self.get_density_gas_profile(radius=n_radius)
-        rad3d, T_g  = self.get_temperature_gas_profile(radius=n_radius)
-
-        # Interpolate Xspec table
-        dC_xspec, dS_xspec, dR_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
-        if np.sum(~np.isnan(dR_xspec)) == 0 and output_type == 'R':
-            raise ValueError("You ask for an output in ph/s/sr (i.e. including instrumental response), but the xspec table was generated without response file.")
-
-        # Get the integrand
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
-        constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
-
-        if output_type == 'S':
-            integrand = constant.to_value('kpc-2')*dS_xspec.to_value('erg cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        elif output_type == 'C':
-            integrand = constant.to_value('kpc-2')*dC_xspec.to_value('cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        elif output_type == 'R':
-            integrand = constant.to_value('kpc-2')*dR_xspec.to_value('cm5 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        else:
-            raise ValueError("Output type available are S, C and R.")        
-        
-        # Projection to get Emmission Measure            
-        Rmax = np.amax(NR500_los*self._R500.to_value('kpc'))  # Max radius to integrate in 3d
-        Rpmax = np.amax(radius.to_value('kpc'))              # Max radius to which we get the profile
-        Rproj, Sx = cluster_profile.proj_any_model(rad3d.to_value('kpc'), integrand,
-                                                   Npt=Npt_los, Rmax=Rmax, Rpmax=Rpmax, Rp_input=radius.to_value('kpc'))
-        Rproj *= u.kpc
-        Sx[Rproj > self._R_truncation] = 0.0
-        
-        # write unit explicitlly
-        if output_type == 'S':
-            Sx *= u.kpc * u.kpc**-2 * u.erg*u.cm**3/u.s * u.cm**-6
-            Sx = (Sx*self._D_ang**2).to('erg s-1 cm-2')/u.sr
-            Sx.to('erg s-1 cm-2 sr-1')
-        elif output_type == 'C':
-            Sx *= u.kpc * u.kpc**-2 * u.cm**3/u.s * u.cm**-6
-            Sx = (Sx*self._D_ang**2).to('s-1 cm-2')/u.sr
-            Sx.to('s-1 cm-2 sr-1')
-        elif output_type == 'R':
-            Sx *= u.kpc * u.kpc**-2 * u.cm**5/u.s * u.cm**-6
-            Sx = (Sx*self._D_ang**2).to('s-1')/u.sr
-            Sx.to('s-1 sr-1')
-        else:
-            raise ValueError("Output type available are S, C and R.")
-        
-        return Rproj.to('kpc'), Sx
-
-    
-    #==================================================
-    # Compute Xray spherical flux
-    #==================================================
-
-    def get_fxsph_profile(self, radius=np.logspace(0,4,1000)*u.kpc, output_type='S'):
-        """
-        Get the spherically integrated Xray flux profile.
-        
-        Parameters
+        Note
         ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - output_type (str): type of ooutput to provide: 
-        S == energy counts in erg/s/cm^2/sr
-        C == counts in ph/s/cm^2/sr
-        R == count rate in ph/s/sr (accounting for instrumental response)
-        
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Fsph_r (quantity): the integrated Xray flux parameter erg/s/cm2
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
-
-        #---------- Define radius associated to the density/temperature
-        press_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        n_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
-        
-        #---------- Get the density profile and temperature
-        rad, n_e  = self.get_density_gas_profile(radius=n_radius)
-        rad, T_g  = self.get_temperature_gas_profile(radius=n_radius)
-
-        #---------- Interpolate the differential surface brightness
-        dC_xspec, dS_xspec, dR_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
-        
-        #---------- Get the integrand
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
-        constant = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2)
-        if output_type == 'S':
-            integrand = constant.to_value('kpc-2')*dS_xspec.to_value('erg cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        elif output_type == 'C':
-            integrand = constant.to_value('kpc-2')*dC_xspec.to_value('cm3 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        elif output_type == 'R':
-            integrand = constant.to_value('kpc-2')*dR_xspec.to_value('cm5 s-1') * n_e.to_value('cm-3')**2 * mu_e/mu_p
-        else:
-            raise ValueError("Output type available are S, C and R.")        
-        
-        #---------- Integrate in 3d
-        EI_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            EI_r[i] = cluster_profile.get_volume_any_model(rad.to_value('kpc'), integrand,
-                                                           radius.to_value('kpc')[i], Npt=1000)
-        if output_type == 'S':
-            flux_r = EI_r*u.Unit('kpc-2 erg cm3 s-1 cm-6 kpc3')
-            flux_r = flux_r.to('erg s-1 cm-2')
-        elif output_type == 'C':
-            flux_r = EI_r*u.Unit('kpc-2 cm3 s-1 cm-6 kpc3')
-            flux_r = flux_r.to('s-1 cm-2')
-        elif output_type == 'R':
-            flux_r = EI_r*u.Unit('kpc-2 cm5 s-1 cm-6 kpc3')
-            flux_r = flux_r.to('s-1')
-        else:
-            raise ValueError("Output type available are S, C and R.")        
-        
-        return radius, flux_r
-
-
-    #==================================================
-    # Compute Xray cylindrical flux
-    #==================================================
-
-    def get_fxcyl_profile(self, radius=np.logspace(0,4,1000)*u.kpc, NR500_los=5.0, Npt_los=100,
-                          output_type='S'):
-        """
-        Get the cylindrically integrated Xray flux profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-        - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
-        - output_type (str): type of ooutput to provide: 
-        S == energy counts in erg/s/cm^2/sr
-        C == counts in ph/s/cm^2/sr
-        R == count rate in ph/s/sr (accounting for instrumental response)
-        
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - Fcyl_r (quantity): the integrated Xray flux parameter erg/s/cm2
+        The pressure profile is truncated at R500 along the line-of-sight.
 
         """
         
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius)
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
-        #---------- Define radius associated to the Sx profile
-        sx_radius = cluster_profile.define_safe_radius_array(radius.to_value('kpc'), Rmin=1.0, Nptmin=1000)*u.kpc
+        # Check output type
+        output_list = ['S', 'C', 'R']
+        if output_type not in output_list:
+            raise ValueError("Available output_type are S, C and R.")        
         
-        #---------- Get the Sx profile
-        r2d, sx_r = self.get_sx_profile(sx_radius, NR500_los=NR500_los, Npt_los=Npt_los, output_type=output_type)
+        # Get the integration limits
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        Rmin = np.amin(radius.to_value('kpc'))*u.kpc
+        Rmax = np.amax(radius.to_value('kpc'))*u.kpc
 
-        #---------- Integrate the Compton parameter in 2d
-        if output_type == 'S':
-            integrand = sx_r.to_value('erg s-1 cm-2 sr-1')
-        elif output_type == 'C':
-            integrand = sx_r.to_value('s-1 cm-2 sr-1')
-        elif output_type == 'R':
-            integrand = sx_r.to_value('s-1 sr-1')
-        else:
-            raise ValueError("Output type available are S, C and R.")        
+        # Define array for integration
+        Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
+        Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
+        r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+        los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+        dN_dVdt = self.get_rate_xray(r3d, output_type=output_type).flatten()
         
-        Fcyl_r = np.zeros(len(radius))
-        for i in range(len(radius)):
-            Fcyl_r[i] = cluster_profile.get_surface_any_model(r2d.to_value('kpc'), integrand,
-                                                              radius.to_value('kpc')[i], Npt=1000)
+        # Compute integral over l.o.s.
+        dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
+        dN_dVdt_proj[radius > self._R_truncation] = 0
+
+        # Convert to physical to angular scale
+        dN_dtdO = dN_dVdt_proj * self._D_ang**2 * u.Unit('sr-1')
+
+        # From intrinsic luminosity to flux
+        dN_dSdtdO = dN_dtdO / (4*np.pi * self._D_lum**2)
+        
+        # return
         if output_type == 'S':
-            flux_r = Fcyl_r / self._D_ang.to_value('kpc')**2 * u.Unit('erg s-1 cm-2')
-        elif output_type == 'C':
-            flux_r = Fcyl_r / self._D_ang.to_value('kpc')**2 * u.Unit('s-1 cm-2')
-        elif output_type == 'R':
-            flux_r = Fcyl_r / self._D_ang.to_value('kpc')**2 * u.Unit('s-1')
-        else:
-            raise ValueError("Output type available are S, C and R.")        
+            output = dN_dSdtdO.to('erg s-1 cm-2 sr-1')
+        if output_type == 'C':
+            output = dN_dSdtdO.to('s-1 cm-2 sr-1')
+        if output_type == 'R':
+            output = dN_dSdtdO.to('s-1 sr-1')
+
+        return radius, output
+
+
+    #==================================================
+    # Compute Xray flux
+    #==================================================
+    
+    def get_xray_flux(self, Rmin=None, Rmax=None,
+                      type_integral='spherical',
+                      Rmin_los=None, NR500_los=5.0,
+                      output_type='C'):
+        
+        """
+        Compute the Xray emission enclosed within Rmax, in 3d (i.e. spherically 
+        integrated), or the Xray emmission enclosed within a circular area (i.e.
+        cylindrical), and in a given band depending on Xspec file. The radius 
+        max can be an array to get flux(<R).
+        
+        Parameters
+        ----------
+        - Rmin (quantity): the minimal radius within with the spectrum is computed 
+        - Rmax (quantity): the maximal radius within with the spectrum is computed.
+        It can be an array.
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - Rmin_los (quantity): minimal radius at which l.o.s integration starts
+        This is used only for cylindrical case
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        This is used only for cylindrical case
+        - output_type (str): type of output
+        S == energy counts in erg/s/cm^2/sr
+        C == counts in ph/s/cm^2/sr
+        R == count rate in ph/s/sr (accounting for instrumental response)
+
+        Outputs
+        ----------
+        - flux (quantity) : the Xray flux in erg s-1 cm-2 or s-1 cm-2 or s-1 
+        (depending on output_type)
+
+
+        """
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Check output type
+        output_list = ['S', 'C', 'R']
+        if output_type not in output_list:
+            raise ValueError("Available output_type are S, C and R.")        
+        
+        # Get the integration limits
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+
+        #----- Case of scalar quantities
+        scalar_flag = False
+        if type(Rmax.value) == float:
+            scalar_flag = True
+            Rmax = np.tile(Rmax, [1]) # replicate Rmax to make it as an array
+        
+        #----- Case of radius array (need to use dN/dVdEdt and not get_profile because spherical flux)
+        if type(Rmax.value) == np.ndarray:
+            # Get frequency sampling
+            if type_integral == 'spherical':
+                Rmax3d = np.amax(Rmax.value)*Rmax.unit
+                Rmin3d = Rmin
+            if type_integral == 'cylindrical':
+                Rmax3d = np.sqrt((NR500_los*self._R500)**2 + (np.amax(Rmax.value)*Rmax.unit)**2)*1.1        
+                Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
+            r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            dN_dVdt = self.get_rate_xray(r3d, output_type=output_type).flatten()
+            
+            # Define output
+            if output_type == 'S':
+                flux = np.zeros(len(Rmax))*u.Unit('erg s-1 cm-2')
+            if output_type == 'C':
+                flux = np.zeros(len(Rmax))*u.Unit('s-1 cm-2')
+            if output_type == 'R':
+                flux = np.zeros(len(Rmax))*u.Unit('s-1')
+
+            # Case of spherical integral: direct volume integration
+            itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='cubic')
+            if type_integral == 'spherical':
+               for i in range(len(Rmax)):
+                   rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
+                   dN_dVdt_i = itpl(rad_i.to_value('kpc'))*dN_dVdt.unit
+                   lum_i = model_tools.spherical_integration(dN_dVdt_i, rad_i)
+                   flux[i] =  lum_i / (4*np.pi * self._D_lum**2)
                 
-        return radius, flux_r
+            # Case of cylindrical integral
+            if type_integral == 'cylindrical':
+                # Compute integral over l.o.s.
+                radius = model_tools.sampling_array(Rmin, np.amax(Rmax.value)*Rmax.unit, NptPd=self._Npt_per_decade_integ, unit=True)
+                dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
+                dN_dVdt_proj[radius > self._R_truncation] = 0
+
+                dN_dSdVdt_proj = dN_dVdt_proj / (4*np.pi * self._D_lum**2)
+        
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='cubic')
+                
+                for i in range(len(Rmax)):
+                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
+                    dN_dSdVdt_proj_i = itpl(rad_i.value)*dN_dSdVdt_proj.unit
+                    flux[i] = model_tools.trapz_loglog(2*np.pi*rad_i*dN_dSdVdt_proj_i, rad_i)
+
+        # Define output
+        if scalar_flag:
+            flux = flux[0] # to return a scalar
+        
+        if output_type == 'S':
+            output = flux.to('erg s-1 cm-2')
+        if output_type == 'C':
+            output = flux.to('s-1 cm-2')
+        if output_type == 'R':
+            output = flux.to('s-1')
+        
+        return flux
 
 
     #==================================================
-    # Compute Sx map 
+    # Compute Xray map
     #==================================================
-    
-    def get_sxmap(self, FWHM=None, NR500_los=5.0, Npt_los=100,
-                  output_type='S'):
+    def get_xray_map(self, Rmin_los=None, NR500_los=5.0,
+                      Rmin=None, Rmax=None,
+                      Normalize=False,
+                      output_type='C'):
         """
-        Compute a Surface brightness X-ray mmap.
+        Compute the Xray map. The map is normalized so that the integral 
+        of the map over the cluster volume is 1 (up to Rmax=5R500).
         
         Parameters
         ----------
-        - FWHM (quantity) : the beam smoothing FWHM (homogeneous to deg)
+        - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the integration will stop at NR500_los x R500
-        - Npt_los (int): the number of points for line of sight integration
-        - output_type (str): type of ooutput to provide: 
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, Rtruncation) for getting the normlization flux.
+        Has no effect if Normalized is False
+        - Normalize (bool): if True, the map is normalized by the flux to get a 
+        template in unit of sr-1 
+        - output_type (str): type of output
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
-        
+
         Outputs
         ----------
-        - sxmap (quantity) : the Sx map
+        synchrotron_map (np.ndarray) : the map in units of sr-1 or brightness
 
         """
-        
+
+        # Check output type
+        output_list = ['S', 'C', 'R']
+        if output_type not in output_list:
+            raise ValueError("Available output_type are S, C and R.")        
+
         # Get the header
         header = self.get_map_header()
-        w = WCS(header)
-        if w.wcs.has_cd():
-            if w.wcs.cd[1,0] != 0 or w.wcs.cd[0,1] != 0:
-                print('!!! WARNING: R.A and Dec. is rotated wrt x and y. The extracted resolution was not checked in such situation.')
-            map_reso_x = np.sqrt(w.wcs.cd[0,0]**2 + w.wcs.cd[1,0]**2)
-            map_reso_y = np.sqrt(w.wcs.cd[1,1]**2 + w.wcs.cd[0,1]**2)
-        else:
-            map_reso_x = np.abs(w.wcs.cdelt[0])
-            map_reso_y = np.abs(w.wcs.cdelt[1])
-        
+
         # Get a R.A-Dec. map
         ra_map, dec_map = map_tools.get_radec_map(header)
 
-        # Get a cluster distance map
+        # Get a cluster distance map (in deg)
         dist_map = map_tools.greatcircle(ra_map, dec_map, self._coord.icrs.ra.to_value('deg'), self._coord.icrs.dec.to_value('deg'))
-
-        # Define the radius used fo computing the Sx profile
+        
+        # Define the radius used fo computing the profile
         theta_max = np.amax(dist_map) # maximum angle from the cluster
         theta_min = np.amin(dist_map) # minimum angle from the cluster (~0 if cluster within FoV)
-        if theta_min == 0:
-            theta_min = 1e-4 # Zero will cause bug, put <1arcsec in this case
-        rmax = theta_max*np.pi/180 * self._D_ang.to_value('kpc')
-        rmin = theta_min*np.pi/180 * self._D_ang.to_value('kpc')
-        radius = np.logspace(np.log10(rmin), np.log10(rmax), 1000)*u.kpc
-
-        # Compute the Compton parameter projected profile
-        r_proj, sx_profile = self.get_sx_profile(radius, NR500_los=NR500_los, Npt_los=Npt_los, output_type=output_type)
-        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi                           # degrees
+        if theta_min > 10 and theta_max > 10:
+            print('!!!!! WARNING: the cluster location is very much offset from the field of view')
+        rmax = theta_max*np.pi/180 * self._D_ang
+        rmin = theta_min*np.pi/180 * self._D_ang
+        radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
-        # Interpolate the profile onto the map
-        if output_type == 'S':
-            sxmap = map_tools.profile2map(sx_profile.to_value('erg s-1 cm-2 sr-1'), theta_proj, dist_map)
-        elif output_type == 'C':
-            sxmap = map_tools.profile2map(sx_profile.to_value('s-1 cm-2 sr-1'), theta_proj, dist_map)
-        elif output_type == 'R':
-            sxmap = map_tools.profile2map(sx_profile.to_value('s-1 sr-1'), theta_proj, dist_map)
-        else:
-            raise ValueError("Output type available are S, C and R.")        
+        # Project the integrand
+        r_proj, profile = self.get_xray_profile(radius, Rmin_los=Rmin_los, NR500_los=NR500_los, output_type=output_type)
+
+        # Convert to angle and interpolate onto a map
+        theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
+        xray_map = map_tools.profile2map(profile.value, theta_proj, dist_map)*profile.unit
         
         # Avoid numerical residual ringing from interpolation
-        sxmap[dist_map > self._theta_truncation.to_value('deg')] = 0
+        xray_map[dist_map > self._theta_truncation.to_value('deg')] = 0
         
-        # Smooth the ymap if needed
-        if FWHM != None:
-            FWHM2sigma = 1.0/(2.0*np.sqrt(2*np.log(2)))
-            sxmap = ndimage.gaussian_filter(sxmap, sigma=(FWHM2sigma*FWHM.to_value('deg')/map_reso_x,
-                                                          FWHM2sigma*FWHM.to_value('deg')/map_reso_y), order=0)
-        # Units and return
-        if output_type == 'S':
-            sxmap = sxmap*u.Unit('erg s-1 cm-2 sr-1')
-        elif output_type == 'C':
-            sxmap = sxmap*u.Unit('s-1 cm-2 sr-1')
-        elif output_type == 'R':
-            sxmap = sxmap*u.Unit('s-1 sr-1')
+        # Compute the normalization: to return a map in sr-1, i.e. by computing the total flux
+        if Normalize:
+            if Rmax is None:
+                if self._R_truncation is not np.inf:
+                    Rmax = self._R_truncation
+                else:                    
+                    Rmax = NR500_los*self._R500
+            if Rmin is None:
+                Rmin = self._Rmin
+            flux = self.get_xray_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, output_type=output_type)
+            xray_map = xray_map / flux
+            xray_map = xray_map.to('sr-1')
         else:
-            raise ValueError("Output type available are S, C and R.")        
-        
-        return sxmap
-
+            if output_type == 'S':
+                xray_map = xray_map.to('erg s-1 cm-2 sr-1')
+            if output_type == 'C':
+                xray_map = xray_map.to('s-1 cm-2 sr-1')
+            if output_type == 'R':
+                xray_map = xray_map.to('s-1 sr-1')
+            
+        return xray_map
+    
