@@ -19,6 +19,7 @@ from ClusterModel import model_tools
 from ClusterTools import cluster_global 
 from ClusterTools import cluster_profile 
 from ClusterTools import cluster_spectra 
+from ClusterTools import cluster_xspec
 from ClusterTools import map_tools
 
 
@@ -297,11 +298,12 @@ class Observables(object):
             else:
                 flux = np.zeros(len(Emin))*u.Unit('cm-2 s-1')
                 
-            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='cubic')
+            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='linear')
                 
             for i in range(len(Emin)):
                 eng_i = model_tools.sampling_array(Emin[i], Emax, NptPd=self._Npt_per_decade_integ, unit=True)
                 dN_dEdSdt_i = itpl(eng_i.value)*dN_dEdSdt.unit
+                
                 flux[i] = model_tools.energy_integration(dN_dEdSdt_i, eng_i, Energy_density=Energy_density)
 
         #----- Case of radius array (need to use dN/dVdEdt and not get_profile because spherical flux)
@@ -334,7 +336,7 @@ class Observables(object):
 
             # Case of spherical integral: direct volume integration
             if type_integral == 'spherical':
-               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='cubic')
+               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='linear')
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
                    dN_dVdt_i = itpl(rad_i.to_value('kpc'))*dN_dVdt.unit
@@ -350,7 +352,7 @@ class Observables(object):
 
                 dN_dSdVdt_proj = dN_dVdt_proj / (4*np.pi * self._D_lum**2)
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -678,7 +680,7 @@ class Observables(object):
             else:
                 flux = np.zeros(len(Emin))*u.Unit('cm-2 s-1')
                 
-            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='cubic')
+            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='linear')
                 
             for i in range(len(Emin)):
                 eng_i = model_tools.sampling_array(Emin[i], Emax, NptPd=self._Npt_per_decade_integ, unit=True)
@@ -715,7 +717,7 @@ class Observables(object):
 
             # Case of spherical integral: direct volume integration
             if type_integral == 'spherical':
-               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='cubic')
+               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='linear')
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
                    dN_dVdt_i = itpl(rad_i.to_value('kpc'))*dN_dVdt.unit
@@ -731,7 +733,7 @@ class Observables(object):
 
                 dN_dSdVdt_proj = dN_dVdt_proj / (4*np.pi * self._D_lum**2)
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1065,7 +1067,7 @@ class Observables(object):
             else:
                 flux = np.zeros(len(Emin))*u.Unit('cm-2 s-1')
                 
-            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='cubic')
+            itpl = interpolate.interp1d(energy.value, dN_dEdSdt.value, kind='linear')
                 
             for i in range(len(Emin)):
                 eng_i = model_tools.sampling_array(Emin[i], Emax, NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1084,7 +1086,7 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_ic_ray(eng, r3d)
+            dN_dEdVdt = self.get_rate_ic(eng, r3d)
 
             # Apply EBL absorbtion
             if self._EBL_model != 'none':
@@ -1102,7 +1104,7 @@ class Observables(object):
 
             # Case of spherical integral: direct volume integration
             if type_integral == 'spherical':
-               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='cubic')
+               itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='linear')
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
                    dN_dVdt_i = itpl(rad_i.to_value('kpc'))*dN_dVdt.unit
@@ -1118,7 +1120,7 @@ class Observables(object):
 
                 dN_dSdVdt_proj = dN_dVdt_proj / (4*np.pi * self._D_lum**2)
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1414,7 +1416,7 @@ class Observables(object):
             flux = np.zeros(len(Rmax))*u.Unit('Jy')
 
             # Case of spherical integral: direct volume integration
-            itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt_E.value, kind='cubic')
+            itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt_E.value, kind='linear')
             if type_integral == 'spherical':
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1431,7 +1433,7 @@ class Observables(object):
 
                 dN_dSdVdt_E_proj = dN_dVdt_E_proj / (4*np.pi * self._D_lum**2)
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_E_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_E_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1569,7 +1571,7 @@ class Observables(object):
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
             dE_dtdVdfdO_f = self.get_rate_sz(frequency, rad, Compton_only=Compton_only)
-            dE_dtdfdO_f = model_tools.spherical_integration(dE_dtdVdf, rad)
+            dE_dtdfdO_f = model_tools.spherical_integration(dE_dtdVdfdO_f, rad)
             
         # Compute the integral        
         if type_integral == 'cylindrical':
@@ -1724,7 +1726,7 @@ class Observables(object):
                 flux = np.zeros(len(Rmax))*u.Unit('Jy')
 
             # Case of spherical integral: direct volume integration
-            itpl = interpolate.interp1d(r3d.to_value('kpc'), dE_dtdVdfdO_f.value, kind='cubic')
+            itpl = interpolate.interp1d(r3d.to_value('kpc'), dE_dtdVdfdO_f.value, kind='linear')
             if type_integral == 'spherical':
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1741,7 +1743,7 @@ class Observables(object):
                 dE_dtdVdfdO_f_proj = model_tools.los_integration_1dfunc(dE_dtdVdfdO_f, r3d, radius, los)
                 dE_dtdVdfdO_f_proj[radius > self._R_truncation] = 0
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dE_dtdVdfdO_f_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dE_dtdVdfdO_f_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1844,8 +1846,109 @@ class Observables(object):
                 sz_map = sz_map.to('Jy sr-1')
                 
         return sz_map
+
     
+    #==================================================
+    # Compute Xray spectrum
+    #==================================================
     
+    def get_xray_spectrum(self, energy=np.linspace(0.1,50,100)*u.keV, 
+                          Rmin=None, Rmax=None, 
+                          type_integral='spherical',
+                          Rmin_los=None, NR500_los=5.0,
+                          output_type='C'):
+        """
+        Compute the X-ray spectrum enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
+        integrated), or the SZ emmission enclosed within a circular area (i.e.
+        cylindrical). The emission is computed for a mean temperature.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of photons
+        - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
+        (default is 1kpc, R500)
+        - type_integral (string): either 'spherical' or 'cylindrical'
+        - Rmin_los (quantity): minimal radius at which l.o.s integration starts
+        This is used only for cylindrical case
+        - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        This is used only for cylindrical case
+        - output_type (str): type of output
+        S == energy counts in erg/s/cm^2/sr
+        C == counts in ph/s/cm^2/sr
+        R == count rate in ph/s/sr (accounting for instrumental response)
+
+        Outputs
+        ----------
+        - energy (quantity) : the physical energy of photons at the center of the bin
+        - dN_dtdSdE (np.ndarray) : the spectrum in units of s-1 cm-2 keV-1
+        
+        """
+        
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='keV')
+
+        # Check the type of integral
+        ok_list = ['spherical', 'cylindrical']
+        if not type_integral in ok_list:
+            raise ValueError("This requested integral type (type_integral) is not available")
+
+        # Get the integration limits
+        if Rmin is None:
+            Rmin = self._Rmin
+        if Rmax is None:
+            Rmax = self._R500
+        if Rmin_los is None:
+            Rmin_los = self._Rmin
+
+        # Get useful quantity
+        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                            Z=self._metallicity_sol*self._abundance)
+            
+        # Get a mean temperature
+        if type_integral == 'spherical':
+            rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            rad, temperature = self.get_temperature_gas_profile(rad)
+            rad, n_e = self.get_density_gas_profile(rad)
+            Tmean = model_tools.spherical_integration(temperature, rad) / (4.0/3*np.pi*Rmax**3)
+            N2int = model_tools.spherical_integration(n_e**2*mu_e/mu_p, rad)
+            
+        if type_integral == 'cylindrical':
+            Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)
+            Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
+            r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
+            los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+            r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+            rad, temperature = self.get_temperature_gas_profile(r3d)
+            temperature[temperature/temperature != 1] = 0
+            rad, n_e = self.get_density_gas_profile(r3d)
+            temperature_proj = model_tools.los_integration_1dfunc(temperature, r3d, r2d, los)
+            temperature_pproj = model_tools.trapz_loglog(2*np.pi*r2d*temperature_proj, r2d)
+            Tmean = temperature_pproj/(2*Rmax3d * np.pi*Rmax**2)
+            n_e2_proj = model_tools.los_integration_1dfunc(n_e**2*mu_e/mu_p, r3d, r2d, los)
+            N2int = model_tools.trapz_loglog(2*np.pi*r2d*n_e2_proj, r2d)
+            
+        # Get the spectrum normalized to 1 cm-5
+        dSB, dNph, dR, ectr, epot = cluster_xspec.xray_spectrum(0.0, Tmean.to_value('keV'), self._abundance, self._redshift,
+                                                                emin=np.amin(energy.to_value('keV')),
+                                                                emax=np.amax(energy.to_value('keV')), nbin=len(energy),
+                                                                Kcor=False,
+                                                                file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
+                                                                model='APEC', cleanup=True, logspace=True)
+
+        # Normalization
+        xspec_norm = (1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2) * N2int).to_value('cm-5')
+        
+        # return
+        if output_type == 'S':
+            output = dSB  * xspec_norm * u.Unit('erg s-1 cm-2 keV-1')
+        if output_type == 'C':
+            output = dNph * xspec_norm * u.Unit('s-1 cm-2 keV-1')
+        if output_type == 'R':
+            output = dR  * xspec_norm  * u.Unit('s-1 keV-1')
+                        
+        return ectr*u.keV, output
+
+
     #==================================================
     # Compute Xray profile
     #==================================================
@@ -2005,7 +2108,7 @@ class Observables(object):
                 flux = np.zeros(len(Rmax))*u.Unit('s-1')
 
             # Case of spherical integral: direct volume integration
-            itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='cubic')
+            itpl = interpolate.interp1d(r3d.to_value('kpc'), dN_dVdt.value, kind='linear')
             if type_integral == 'spherical':
                for i in range(len(Rmax)):
                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
@@ -2022,7 +2125,7 @@ class Observables(object):
 
                 dN_dSdVdt_proj = dN_dVdt_proj / (4*np.pi * self._D_lum**2)
         
-                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='cubic')
+                itpl = interpolate.interp1d(radius.to_value('kpc'), dN_dSdVdt_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
                     rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
