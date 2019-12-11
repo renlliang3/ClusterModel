@@ -21,6 +21,7 @@ from ClusterModel import model_tools
 from ClusterTools import cluster_global
 from ClusterTools import cluster_profile
 from ClusterTools import cluster_spectra
+from ClusterTools import cluster_szspec
 from ClusterTools import cluster_xspec
 from ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
 from ClusterTools import cluster_electron_loss
@@ -1170,25 +1171,27 @@ class Physics(object):
         radius, temperature = self.get_temperature_gas_profile(radius)
         radius, pressure    = self.get_pressure_gas_profile(radius)
 
-        # Get the SZ spectrum
-        x = const.h * frequency / (const.k_B * self._cosmo.Tcmb0)
-        f_nu = x**4 * np.exp(x) / (np.exp(x)-1)**2 * (x*(np.exp(x)+1)/(np.exp(x)-1) - 4)
-        I0 = 2*(const.k_B*self._cosmo.Tcmb0)**3/(const.h*const.c)**2*u.sr**-1
-        dI = I0*f_nu
+        # Correct temperature for nan (e.g. beyond Rtrunc)
+        temperature[temperature/temperature != 1] = 0
         
+        # Get the SZ spectrum
+        f_nu = cluster_szspec.tsz_spec_relativistic(frequency, temperature)    # 2D: Nfreq, Ntemp
+        f_nu0 = cluster_szspec.tsz_spec_relativistic(frequency, temperature*0) # Reference non relativistic
+        I0 = cluster_szspec.get_I0_CMB()
+
         # Get SZ power per unit volume and frequency
         if Compton_only:
-            compton =  model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            #compton_relat = compton * f_nu/f_nu0
             output = compton.to('kpc-1')
         else:
-            spatial = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
-            spectral = model_tools.replicate_array(dI, len(radius), T=True)
-            dE_dtdVdfdO = spatial * spectral
+            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            dE_dtdVdfdO = compton * I0*f_nu
             output = dE_dtdVdfdO.to('eV s-1 cm-3 Hz-1 sr-1')
             
         return output
 
-
+    
     #==================================================
     # Compute a Xspec table versus temperature
     #==================================================

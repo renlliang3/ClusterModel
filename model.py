@@ -43,8 +43,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     To do list
     ----------  
     - Account for K-correction in spectra
-    - Account for SZ relativistic corrections
-    - Check Klein Nishina effect which reduces IC at high energy
     - Split in subclasses
     - Add extra primary electron population
     
