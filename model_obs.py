@@ -896,7 +896,8 @@ class Observables(object):
     def get_ic_spectrum(self, energy=np.logspace(-2,6,100)*u.GeV,
                         Rmin=None, Rmax=None,
                         type_integral='spherical',
-                        Rmin_los=None, NR500_los=5.0):
+                        Rmin_los=None, NR500_los=5.0,
+                        Kcor=True):
         """
         Compute the inverse Compton emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the inverse Compton emmission enclosed within an circular area (i.e.
@@ -912,6 +913,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -923,6 +925,12 @@ class Observables(object):
         # In case the input is not an array
         energy = model_tools.check_qarray(energy, unit='GeV')
 
+        # K-correction
+        if Kcor:
+            energy_rf = energy*(1+self._redshift)
+        else:
+            energy_rf = energy*1.0
+        
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
         if not type_integral in ok_list:
@@ -939,7 +947,7 @@ class Observables(object):
         # Compute the integral
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_ic(energy, rad)
+            dN_dEdVdt = self.get_rate_ic(energy_rf, rad)
             dN_dEdt = model_tools.spherical_integration(dN_dEdVdt, rad)
             
         # Compute the integral        
@@ -949,7 +957,7 @@ class Observables(object):
             r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_ic(energy, r3d)
+            dN_dEdVdt = self.get_rate_ic(energy_rf, r3d)
             dN_dEdt = model_tools.cylindrical_integration(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
         
         # From intrinsic luminosity to flux
@@ -969,7 +977,8 @@ class Observables(object):
 
     def get_ic_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                        Emin=None, Emax=None, Energy_density=False,
-                       Rmin_los=None, NR500_los=5.0):
+                       Rmin_los=None, NR500_los=5.0,
+                       Kcor=True):
         """
         Compute the inverse Compton emission profile within Emin-Emax.
         
@@ -982,6 +991,7 @@ class Observables(object):
         the number density is computed.
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1002,13 +1012,19 @@ class Observables(object):
         Rmin = np.amin(radius.to_value('kpc'))*u.kpc
         Rmax = np.amax(radius.to_value('kpc'))*u.kpc
 
-        # Define array for integration
+        # Define energy and K correction
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+        if Kcor:
+            eng_rf = eng*(1+self._redshift)
+        else:
+            eng_rf = eng*1.0
+        
+        # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
         Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdVdt = self.get_rate_ic(eng, r3d)
+        dN_dEdVdt = self.get_rate_ic(eng_rf, r3d)
 
         # Apply EBL absorbtion
         if self._EBL_model != 'none':
@@ -1043,7 +1059,8 @@ class Observables(object):
     def get_ic_flux(self, Emin=None, Emax=None, Energy_density=False,
                     Rmin=None, Rmax=None,
                     type_integral='spherical',
-                    Rmin_los=None, NR500_los=5.0):
+                    Rmin_los=None, NR500_los=5.0,
+                    Kcor=True):
         
         """
         Compute the inverse Compton emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -1066,6 +1083,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1100,7 +1118,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_ic_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los)
+                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
 
             # Integrate over it and return
             flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
@@ -1110,7 +1128,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(np.amin(Emin.value)*Emin.unit, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_ic_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los)
+                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
 
             # Integrate over it and return
             if Energy_density:
@@ -1129,6 +1147,11 @@ class Observables(object):
         if type(Rmax.value) == np.ndarray:
             # Get energy integration
             eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
+            if Kcor:
+                eng_rf = eng*(1+self._redshift)
+            else:
+                eng_rf = eng*1.0
+            
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
                 Rmin3d = Rmin
@@ -1137,7 +1160,7 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_ic(eng, r3d)
+            dN_dEdVdt = self.get_rate_ic(eng_rf, r3d)
 
             # Apply EBL absorbtion
             if self._EBL_model != 'none':
@@ -1193,7 +1216,8 @@ class Observables(object):
     def get_ic_map(self, Emin=None, Emax=None,
                    Rmin_los=None, NR500_los=5.0,
                    Rmin=None, Rmax=None,
-                   Energy_density=False, Normalize=False):
+                   Energy_density=False, Normalize=False,
+                   Kcor=True):
         """
         Compute the inverse Compton map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -1214,6 +1238,7 @@ class Observables(object):
         Has no effect if Normalized is True
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1241,7 +1266,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_ic_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
-                                              Rmin_los=Rmin_los, NR500_los=NR500_los)
+                                              Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -1260,7 +1285,7 @@ class Observables(object):
             if Rmin is None:
                 Rmin = self._Rmin
             flux = self.get_ic_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los,
-                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density)
+                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density, Kcor=Kcor)
             ic_map = ic_map / flux
             ic_map = ic_map.to('sr-1')
 
@@ -1280,7 +1305,8 @@ class Observables(object):
     def get_synchrotron_spectrum(self, frequency=np.logspace(-3,2,100)*u.GHz,
                                  Rmin=None, Rmax=None,
                                  type_integral='spherical',
-                                 Rmin_los=None, NR500_los=5.0):
+                                 Rmin_los=None, NR500_los=5.0,
+                                 Kcor=True):
         """
         Compute the synchrotron emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the synchrotron emmission enclosed within a circular area (i.e.
@@ -1296,6 +1322,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1308,6 +1335,12 @@ class Observables(object):
         frequency = model_tools.check_qarray(frequency, unit='GHz')
         energy = (const.h * frequency).to('eV')
 
+        # K-correction
+        if Kcor:
+            energy_rf = energy*(1+self._redshift)
+        else:
+            energy_rf = energy*1.0
+        
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
         if not type_integral in ok_list:
@@ -1324,7 +1357,7 @@ class Observables(object):
         # Compute the integral
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_synchrotron(energy, rad)
+            dN_dEdVdt = self.get_rate_synchrotron(energy_rf, rad)
             dN_dEdt = model_tools.spherical_integration(dN_dEdVdt, rad)
             
         # Compute the integral        
@@ -1334,7 +1367,7 @@ class Observables(object):
             r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_synchrotron(energy, r3d)
+            dN_dEdVdt = self.get_rate_synchrotron(energy_rf, r3d)
             dN_dEdt = model_tools.cylindrical_integration(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
             
         # From intrinsic luminosity to flux
@@ -1349,7 +1382,8 @@ class Observables(object):
 
     def get_synchrotron_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                                 freq0=1*u.GHz,
-                                Rmin_los=None, NR500_los=5.0):
+                                Rmin_los=None, NR500_los=5.0,
+                                Kcor=True):
         """
         Compute the synchrotron emission profile at frequency freq0.
         
@@ -1359,6 +1393,7 @@ class Observables(object):
         - freq0 (quantity): the frequency at which the profile is computed
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1375,13 +1410,19 @@ class Observables(object):
         Rmin = np.amin(radius.to_value('kpc'))*u.kpc
         Rmax = np.amax(radius.to_value('kpc'))*u.kpc
 
-        # Define array for integration
+        # Define energy and K correction
         eng0 = (freq0 * const.h).to('eV')
+        if Kcor:
+            eng0_rf = eng0*(1+self._redshift)
+        else:
+            eng0_rf = eng0*1.0
+
+        # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
         Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dVdt_E = self.get_rate_synchrotron(eng0, r3d).flatten()
+        dN_dVdt_E = self.get_rate_synchrotron(eng0_rf, r3d).flatten()
         
         # Compute integral over l.o.s.
         dN_dVdt_E_proj = model_tools.los_integration_1dfunc(dN_dVdt_E, r3d, radius, los)
@@ -1406,7 +1447,8 @@ class Observables(object):
     def get_synchrotron_flux(self, freq0=1*u.GHz,
                              Rmin=None, Rmax=None,
                              type_integral='spherical',
-                             Rmin_los=None, NR500_los=5.0):
+                             Rmin_los=None, NR500_los=5.0,
+                             Kcor=True):
         
         """
         Compute the synchrotron emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -1424,6 +1466,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1447,12 +1490,17 @@ class Observables(object):
         #----- Case of scalar quantities
         if type(Rmax.value) == float:
             freq0, flux = self.get_synchrotron_spectrum(freq0, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
         
         #----- Case of radius array (need to use dN/dVdEdt and not get_profile because spherical flux)
         if type(Rmax.value) == np.ndarray:
             # Get frequency sampling
             eng0 = (freq0 * const.h).to('eV')
+            if Kcor:
+                eng0_rf = eng0*(1+self._redshift)
+            else:
+                eng0_rf = eng0*1.0
+            
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
                 Rmin3d = Rmin
@@ -1461,7 +1509,7 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dVdt_E = self.get_rate_synchrotron(eng0, r3d).flatten()
+            dN_dVdt_E = self.get_rate_synchrotron(eng0_rf, r3d).flatten()
 
             # Define output
             flux = np.zeros(len(Rmax))*u.Unit('Jy')
@@ -1500,7 +1548,8 @@ class Observables(object):
     def get_synchrotron_map(self, freq0=1*u.GHz,
                             Rmin_los=None, NR500_los=5.0,
                             Rmin=None, Rmax=None,
-                            Normalize=False):
+                            Normalize=False,
+                            Kcor=True):
         """
         Compute the synchrotron map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -1516,6 +1565,7 @@ class Observables(object):
         Has no effect if Normalized is False
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1543,7 +1593,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_synchrotron_profile(radius, freq0=freq0, 
-                                                       Rmin_los=Rmin_los, NR500_los=NR500_los)
+                                                       Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -1561,7 +1611,7 @@ class Observables(object):
                     Rmax = NR500_los*self._R500
             if Rmin is None:
                 Rmin = self._Rmin
-            flux = self.get_synchrotron_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, freq0=freq0)
+            flux = self.get_synchrotron_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, freq0=freq0, Kcor=Kcor)
             synchrotron_map = synchrotron_map / flux
             synchrotron_map = synchrotron_map.to('sr-1')
 
@@ -1907,7 +1957,8 @@ class Observables(object):
                           Rmin=None, Rmax=None, 
                           type_integral='spherical',
                           Rmin_los=None, NR500_los=5.0,
-                          output_type='C'):
+                          output_type='C',
+                          Kcor=True):
         """
         Compute the X-ray spectrum enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the SZ emmission enclosed within a circular area (i.e.
@@ -1927,6 +1978,7 @@ class Observables(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
+        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
 
         Outputs
         ----------
@@ -1954,7 +2006,7 @@ class Observables(object):
         # Get useful quantity
         mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
                                                                             Z=self._metallicity_sol*self._abundance)
-            
+        
         # Get a mean temperature
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
