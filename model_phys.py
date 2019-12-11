@@ -109,7 +109,7 @@ class Physics(object):
     - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
     nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
     when getting profiles and maps
-    - itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
+    - _itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
     - get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc, output_type='C'): compute
     the X-ray emission per unit volume
 
@@ -1201,7 +1201,7 @@ class Physics(object):
                          nH=0.0/u.cm**2, file_HI=None, visu_nH=False,
                          model='APEC',
                          resp_file=None, data_file=None, app_nH_model=False,
-                         Kcor=False):
+                         Kcor=True):
         """
         Generate an xspec table as a function of temperature, for the cluster.
         This require xspec to be installed.
@@ -1279,7 +1279,7 @@ class Physics(object):
     # Read and interpolate xspec tables
     #==================================================
     
-    def itpl_xspec_table(self, xspecfile, Tinput):
+    def _itpl_xspec_table(self, xspecfile, Tinput):
         """
         Read an Xspec table and interpolate values at a given temperature
 
@@ -1372,7 +1372,7 @@ class Physics(object):
         radius, n_e = self.get_density_gas_profile(radius)
 
         # Interpolate Xspec table at temperature values
-        dC_xspec, dS_xspec, dR_xspec = self.itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
+        dC_xspec, dS_xspec, dR_xspec = self._itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
         if np.sum(~np.isnan(dR_xspec)) == 0 and output_type == 'R':
             msg = ('You ask for an output in ph/s/sr (i.e. including instrumental response), ',
                    'but the xspec table was generated without response file.')
