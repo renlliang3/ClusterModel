@@ -42,7 +42,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Account for K-correction in spectra
     - Split in subclasses
     - Add extra primary electron population
     
