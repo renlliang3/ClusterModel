@@ -2034,7 +2034,7 @@ class Observables(object):
         dSB, dNph, dR, ectr, epot = cluster_xspec.xray_spectrum(0.0, Tmean.to_value('keV'), self._abundance, self._redshift,
                                                                 emin=np.amin(energy.to_value('keV')),
                                                                 emax=np.amax(energy.to_value('keV')), nbin=len(energy),
-                                                                Kcor=False,
+                                                                Kcor=Kcor,
                                                                 file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
                                                                 model='APEC', cleanup=True, logspace=True)
 
@@ -2063,6 +2063,7 @@ class Observables(object):
         """
         Get the Xray surface brightness profile. An xspec table file is needed as 
         output_dir+'/XSPEC_table.txt'. The energy band is defined in this file.
+        Kcorrection can be computed or not when running xspec table.
         
         Parameters
         ----------
@@ -2141,7 +2142,8 @@ class Observables(object):
         integrated), or the Xray emmission enclosed within a circular area (i.e.
         cylindrical), and in a given band depending on Xspec file. The radius 
         max can be an array to get flux(<R).
-        
+        Kcorrection can be computed or not when running xspec table.
+
         Parameters
         ----------
         - Rmin (quantity): the minimal radius within with the spectrum is computed 
@@ -2259,7 +2261,8 @@ class Observables(object):
         """
         Compute the Xray map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
-        
+        Kcorrection can be computed or not when running xspec table.
+
         Parameters
         ----------
         - Rmin_los (Quantity): the radius at which line of sight integration starts
