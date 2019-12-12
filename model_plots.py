@@ -6,7 +6,7 @@ is dedicated to the computing of observables.
 """
 
 #==================================================
-# Requested imports and style
+# Requested imports
 #==================================================
 
 import matplotlib.pyplot as plt
@@ -17,6 +17,10 @@ import numpy as np
 from astropy.wcs import WCS
 from astropy import constants as const
 import os
+
+#==================================================
+# Style
+#==================================================
 
 cta_energy_range   = [0.02, 100.0]*u.TeV
 fermi_energy_range = [0.1, 300.0]*u.GeV

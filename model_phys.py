@@ -16,16 +16,15 @@ import os
 import astropy.units as u
 from astropy import constants as const
 
-from ClusterModel import model_tools
-
-from ClusterTools import cluster_global
-from ClusterTools import cluster_profile
-from ClusterTools import cluster_spectra
-from ClusterTools import cluster_szspec
-from ClusterTools import cluster_xspec
-from ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
-from ClusterTools import cluster_electron_loss
-from ClusterTools import cluster_electron_emission
+from ClusterModel              import model_tools
+from ClusterModel.ClusterTools import cluster_global
+from ClusterModel.ClusterTools import cluster_profile
+from ClusterModel.ClusterTools import cluster_spectra
+from ClusterModel.ClusterTools import cluster_szspec
+from ClusterModel.ClusterTools import cluster_xspec
+from ClusterModel.ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
+from ClusterModel.ClusterTools import cluster_electron_loss
+from ClusterModel.ClusterTools import cluster_electron_emission
     
 
 #==================================================

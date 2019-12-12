@@ -17,9 +17,6 @@ import astropy.cosmology
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 
-from ClusterTools import cluster_global 
-from ClusterTools import cluster_spectra 
-
 from ClusterModel              import model_title
 from ClusterModel              import model_tools
 from ClusterModel.model_admin  import Admin
@@ -27,6 +24,8 @@ from ClusterModel.model_modpar import Modpar
 from ClusterModel.model_phys   import Physics
 from ClusterModel.model_obs    import Observables
 from ClusterModel.model_plots  import Plots
+from ClusterModel.ClusterTools import cluster_global 
+from ClusterModel.ClusterTools import cluster_spectra 
 
 
 #==================================================

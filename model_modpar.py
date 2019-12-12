@@ -3,9 +3,10 @@ This file deals with 'model parameters' issues regarding the Cluster Class (e.g.
 """
 import astropy.units as u
 import numpy as np
-from ClusterTools import cluster_global
-from ClusterTools import cluster_profile 
-from ClusterTools import cluster_spectra
+
+from ClusterModel.ClusterTools import cluster_global
+from ClusterModel.ClusterTools import cluster_profile 
+from ClusterModel.ClusterTools import cluster_spectra
 
 #==================================================
 # Admin class

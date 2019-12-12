@@ -15,12 +15,12 @@ from astropy.wcs import WCS
 from astropy import constants as const
 import scipy.interpolate as interpolate
 
-from ClusterModel import model_tools
-from ClusterTools import cluster_global 
-from ClusterTools import cluster_profile 
-from ClusterTools import cluster_spectra 
-from ClusterTools import cluster_xspec
-from ClusterTools import map_tools
+from ClusterModel              import model_tools
+from ClusterModel.ClusterTools import cluster_global 
+from ClusterModel.ClusterTools import cluster_profile 
+from ClusterModel.ClusterTools import cluster_spectra 
+from ClusterModel.ClusterTools import cluster_xspec
+from ClusterModel.ClusterTools import map_tools
 
 
 #==================================================
