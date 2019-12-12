@@ -24,6 +24,9 @@ class ClusterElectronEmission(object):
     """ Observable class
     This class compute synchrotron and inverse compton emission for a population 
     of relativistic electrons in a magnetic field in in CMB photon field.
+    At high energy, the IC emission analytical parametrization present sharp features 
+    which require a rather high NptEePD (10 is clearly to low and will induce wiggles 
+    in the spectrum)
 
     Attributes
     ----------  

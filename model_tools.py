@@ -356,7 +356,7 @@ def los_integration_2dfunc(f_E_r, eng, r3d, r2d, los):
     index = np.argsort(index_sort)         # r3d_g2_flat_sort[index] gives r3d_g2_flat
 
     # Interpolated the function at the new position    
-    itpl = interpolate.interp2d(r3d, eng, f_E_r, kind='linear')
+    itpl = interpolate.interp2d(r3d, eng, f_E_r, kind='cubic')
     f_E_r_g2_flat_sort = itpl(r3d_g2_flat_sort, eng)
 
     # Reshaping to make it as expected: unsorted and Neng x Nr2d x Nlos
@@ -413,7 +413,7 @@ def los_integration_1dfunc(f_r, r3d, r2d, los):
     index = np.argsort(index_sort)         # r3d_g2_flat_sort[index] gives r3d_g2_flat
 
     # Interpolated the function at the new position    
-    itpl = interpolate.interp1d(r3d, f_r, kind='linear')
+    itpl = interpolate.interp1d(r3d, f_r, kind='cubic')
     f_r_g2_flat_sort = itpl(r3d_g2_flat_sort)
 
     # Reshaping to make it as expected

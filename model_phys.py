@@ -817,6 +817,11 @@ class Physics(object):
         """
         Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
+        Note
+        ----------
+        At high energy, wit few point per decade, some "lines" may appear in the spectrum
+        due to numerical issues.
+
         Parameters
         ----------
         - energy (quantity) : the physical energy of gamma rays
@@ -865,6 +870,11 @@ class Physics(object):
         """
         Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
+        Note
+        ----------
+        At high energy, wit few point per decade, some "lines" may appear in the spectrum
+        due to numerical issues.
+
         Parameters
         ----------
         - energy (quantity) : the physical energy of gamma rays
@@ -1111,6 +1121,12 @@ class Physics(object):
         """
         Compute the inverse compton density as dN/dEdVdt = f(E, r)
         
+        Note
+        ----------
+        At high energy, the IC emission analytical parametrization present sharp features 
+        which require a rather high NptEePD (10 is clearly to low and will induce wiggles 
+        in the spectrum)
+
         Parameters
         ----------
         - energy (quantity) : the physical energy of photons

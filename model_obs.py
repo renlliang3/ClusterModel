@@ -903,6 +903,12 @@ class Observables(object):
         integrated), or the inverse Compton emmission enclosed within an circular area (i.e.
         cylindrical).
         
+        Note
+        ----------
+        At high energy, the IC emission analytical parametrization present sharp features 
+        which require a rather high NptEePD (10 is clearly to low and will induce wiggles 
+        in the spectrum)
+
         Parameters
         ----------
         - energy (quantity) : the physical energy of photons
