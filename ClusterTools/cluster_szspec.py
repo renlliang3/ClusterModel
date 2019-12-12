@@ -9,7 +9,7 @@ from astropy.cosmology import Planck15 as cosmo
 
 
 #===================================================
-#========== Synchrotron loss
+#========== CMB intensity
 #===================================================
 def get_I0_CMB():
     """
@@ -27,13 +27,13 @@ def get_I0_CMB():
     return I0.to('MJy sr-1')
 
 #===================================================
-#========== Synchrotron loss
+#========== Non relativistic tSZ spectrum
 #===================================================
 def tsz_spec(frequency):
     """
     Compute the non relativistic SZ spectrum, f(nu)
     as in delta I_nu = I0 f(nu) y
-
+    
     Parameters
     ----------
     - frequency (quantity): frequency array homogeneous to GHz
@@ -49,7 +49,7 @@ def tsz_spec(frequency):
     return f_nu
 
 #===================================================
-#========== Synchrotron loss
+#========== Relativistic tSZ spectrum
 #===================================================
 def tsz_spec_relativistic(frequency, kBT):
     """

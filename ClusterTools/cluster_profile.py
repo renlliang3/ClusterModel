@@ -9,7 +9,7 @@ import scipy.integrate as integrate
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 
-from ClusterTools import map_tools
+from ClusterModel.ClusterTools import map_tools
 
 #===================================================
 #========== Beta model

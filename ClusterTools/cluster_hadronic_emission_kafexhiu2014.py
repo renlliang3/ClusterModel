@@ -14,7 +14,7 @@ import numpy as np
 from astropy import constants as const
 import astropy.units as u
 
-from ClusterTools import cluster_hadronic_emission_kelner2006
+from ClusterModel.ClusterTools import cluster_hadronic_emission_kelner2006
 
 #==================================================
 # Class

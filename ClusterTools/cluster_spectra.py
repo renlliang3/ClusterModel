@@ -9,10 +9,10 @@ import scipy.integrate as integrate
 import scipy.interpolate as interpolate
 from astropy import constants as const
 import matplotlib.pyplot as plt
-
 from ebltable.tau_from_model import OptDepth
 
-from ClusterTools import cluster_profile
+from ClusterModel.ClusterTools import cluster_profile
+
 
 #===================================================
 #========== Compute the pp interaction thershold
@@ -35,6 +35,7 @@ def pp_pion_kinematic_energy_threshold():
     
     return E_th
 
+
 #===================================================
 #========== PowerLaw model
 #===================================================
@@ -55,6 +56,7 @@ def powerlaw_model(energy_gev, k0, index, E0=1.0):
     """
 
     return k0 * (energy_gev/E0)**(-index)
+
 
 #===================================================
 #========== PowerLaw model
@@ -77,6 +79,7 @@ def exponentialcutoffpowerlaw_model(energy_gev, k0, index, Ecut, E0=1.0):
     """
     
     return k0 * (energy_gev/E0)**(-index) * np.exp(-energy_gev/Ecut)
+
 
 #===================================================
 #========== Integral power law
@@ -107,6 +110,7 @@ def get_integral_powerlaw_model(Emin, Emax, k0, index, E0=1.0):
     output = k0 * E0**(1-index) / (1-index) * ( (Emax/E0)**(1-index) - (Emin/E0)**(1-index))
     
     return output
+
 
 #===================================================
 #========== Integrate a model
@@ -148,6 +152,7 @@ def get_integral_any_model(energy, f, Emin, Emax, Npt=1000):
 
     return output
 
+
 #===================================================
 #========== Heaviside function
 #===================================================
@@ -165,6 +170,7 @@ def heaviside(x):
     """
 
     return (np.sign(x) + 1) / 2.0
+
 
 #===================================================
 #========== Proton-proton cross section
@@ -205,6 +211,7 @@ def sigma_pp(E_p, model='Kafexhiu2014'):
     
     return sig_pp
 
+
 #===================================================
 #========== Pariticle distribution term
 #===================================================
@@ -225,6 +232,7 @@ def J_p(Ep, norm=1.0, alpha=2.0):
 
     return norm*(Ep/1.0)**(-alpha)
 
+
 #===================================================
 #========== Pariticle distribution term multiplyied by energy
 #===================================================
@@ -243,7 +251,6 @@ def J_p2(Ep, norm=1.0, alpha=2.0):
     - The particle distribution times energy in units of cm^-3
     """
     return Ep*norm*(Ep/1.0)**(-alpha)
-
 
 
 #===================================================

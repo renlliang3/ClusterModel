@@ -9,7 +9,7 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ClusterTools import map_tools
+from ClusterModel.ClusterTools import map_tools
 
 
 #==================================================
