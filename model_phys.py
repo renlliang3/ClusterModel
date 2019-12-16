@@ -84,7 +84,7 @@ class Physics(object):
     
     * Methods related to the physical processes in the cluster
 
-    - get_rate_gamma_ray(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    - get_rate_gamma(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the gamma ray emission rate dN/dEdVdt versus energy and radius
     - get_rate_cre(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the CRe production rate dN/dEdVdt versus energy and radius
@@ -106,7 +106,7 @@ class Physics(object):
     Compute the SZ emission per cm3
 
     - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
-    nH=0.0/u.cm**2, file_HI=None,Kcor=False): compute a temperature versus counts/Sx table to be interpolated
+    nH=0.0/u.cm**2, file_HI=None): compute a temperature versus counts/Sx table to be interpolated
     when getting profiles and maps
     - _itpl_xspec_table(self, xspecfile, Tinput): interpolate xspec tables to chosen temperature
     - get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc, output_type='C'): compute
@@ -765,7 +765,7 @@ class Physics(object):
     # Get the gamma ray production rate
     #==================================================
     
-    def get_rate_gamma_ray(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_gamma(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the gamma ray production rate as dN/dEdVdt = f(E, r)
         
@@ -1215,8 +1215,7 @@ class Physics(object):
                          Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
                          nH=0.0/u.cm**2, file_HI=None, visu_nH=False,
                          model='APEC',
-                         resp_file=None, data_file=None, app_nH_model=False,
-                         Kcor=True):
+                         resp_file=None, data_file=None, app_nH_model=False):
         """
         Generate an xspec table as a function of temperature, for the cluster.
         This require xspec to be installed.
@@ -1240,7 +1239,6 @@ class Physics(object):
         (see https://heasarc.gsfc.nasa.gov/FTP/rosat/doc/xselect_guide/xselect_guide_v1.1.1/xselect_ftools.pdf,
         section 5)
         - app_nH_model (bool): apply nH absorbtion to the initial model without instrumental effects
-        - Kcor (bool): shift the energy by 1+z to go to the cluster frame
 
         Outputs
         ----------
@@ -1281,7 +1279,17 @@ class Physics(object):
         cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table.txt', nH2use, self._abundance, self._redshift,
                                        Emin.to_value('keV'), Emax.to_value('keV'), 
                                        Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
-                                       Kcor=Kcor,
+                                       file_ana=self._output_dir+'/xspec_analysis.txt',
+                                       file_out=self._output_dir+'/xspec_analysis_output.txt',
+                                       model=model,
+                                       resp_file=resp_file, data_file=data_file, app_nH_model=app_nH_model,
+                                       cleanup=True,
+                                       logspace=True)
+
+        # Compute the table in the case of the cluster frame
+        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table_ClusterFrame.txt', nH2use, self._abundance, 0.0,
+                                       Emin.to_value('keV'), Emax.to_value('keV'), 
+                                       Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
                                        file_ana=self._output_dir+'/xspec_analysis.txt',
                                        file_out=self._output_dir+'/xspec_analysis_output.txt',
                                        model=model,
@@ -1355,7 +1363,9 @@ class Physics(object):
     # Get the Xray rate
     #==================================================
     
-    def get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc, output_type='C'):
+    def get_rate_xray(self, radius=np.logspace(0,4,100)*u.kpc,
+                      output_type='C',
+                      Cframe=False):
         """
         Compute the Xray emission per unit volume. An xspec table file is needed as 
         output_dir+'/XSPEC_table.txt'. The energy band is defined in this file.
@@ -1367,6 +1377,7 @@ class Physics(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1387,7 +1398,12 @@ class Physics(object):
         radius, n_e = self.get_density_gas_profile(radius)
 
         # Interpolate Xspec table at temperature values
-        dC_xspec, dS_xspec, dR_xspec = self._itpl_xspec_table(self._output_dir+'/XSPEC_table.txt', T_g)
+        if Cframe:
+            tab_file = self._output_dir+'/XSPEC_table_ClusterFrame.txt'
+        else:
+            tab_file = self._output_dir+'/XSPEC_table.txt'
+
+        dC_xspec, dS_xspec, dR_xspec = self._itpl_xspec_table(tab_file, T_g)
         if np.sum(~np.isnan(dR_xspec)) == 0 and output_type == 'R':
             msg = ('You ask for an output in ph/s/sr (i.e. including instrumental response), ',
                    'but the xspec table was generated without response file.')
