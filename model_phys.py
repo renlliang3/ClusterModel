@@ -1384,7 +1384,7 @@ class Physics(object):
         - {dN_dtdV, dE_dtdV, dNdS_dtdV} (np.ndarray): the differential production rate
 
         """
-
+        
         # In case the input is not an array
         radius = model_tools.check_qarray(radius, unit='kpc')
 
@@ -1396,7 +1396,7 @@ class Physics(object):
         # Get the pressure and temperature profile
         radius, T_g = self.get_temperature_gas_profile(radius)
         radius, n_e = self.get_density_gas_profile(radius)
-
+        
         # Interpolate Xspec table at temperature values
         if Cframe:
             tab_file = self._output_dir+'/XSPEC_table_ClusterFrame.txt'
