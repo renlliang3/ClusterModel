@@ -2035,6 +2035,9 @@ class Observables(object):
             Tmean = temperature_pproj/(2*Rmax3d * np.pi*Rmax**2)
             n_e2_proj = model_tools.los_integration_1dfunc(n_e**2*mu_e/mu_p, r3d, r2d, los)
             N2int = model_tools.trapz_loglog(2*np.pi*r2d*n_e2_proj, r2d)
+
+        if not self._silent:
+            print('Mean temperature ofuse to compute the spectrum:', Tmean)
             
         # Get the spectrum normalized to 1 cm-5
         if Cframe:
