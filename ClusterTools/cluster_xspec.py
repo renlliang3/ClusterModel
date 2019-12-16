@@ -159,7 +159,7 @@ def make_xspec_file(nH, Tgas, ab, redshift, emin, emax,
         print('!!! WARNING: both data_file and resp_file should be provided to account for instrumental effects')
     if resp_file != None and data_file == None:
         print('!!! WARNING: both data_file and resp_file should be provided to account for instrumental effects')
-
+    
     #---------- Decide if nH should be applyied also to the initial model
     nH_ini = 0.0
     if app_nH_model:
