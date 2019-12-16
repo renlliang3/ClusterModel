@@ -125,7 +125,7 @@ def get_xspec_flux(filename):
 #==================================================
 
 def make_xspec_file(nH, Tgas, ab, redshift, emin, emax,
-                    Kcor=False, filename='./xspec_analysis.txt', model='APEC',
+                    filename='./xspec_analysis.txt', model='APEC',
                     resp_file=None, data_file=None, app_nH_model=False):
     """
     Create a file ready for Xspec, with normalization (see MEKAL or APEC in xspec) set to 1.
@@ -138,7 +138,6 @@ def make_xspec_file(nH, Tgas, ab, redshift, emin, emax,
     - redshift (float) cluster redshift
     - emin (float): minimal band energy (keV) at observer
     - emax (float): maximal band energy (keV) at observer
-    - Kcor (bool): apply K-correction
     - filename (str): file name to be created
     - model (str): which model to use
     - resp_file (str): full path to the response file of e.g., ROSAT PSPC
@@ -173,10 +172,7 @@ def make_xspec_file(nH, Tgas, ab, redshift, emin, emax,
             txtfile.write('model phabs(apec) & ' +str(nH_ini)+',-1 & '+str(Tgas)+',-1 & '+str(ab)+',-1 & '+str(redshift)+',-1 & 1,-1 \n')
         if model == 'MEKAL':
             txtfile.write('model phabs(mekal) & '+str(nH_ini)+',-1 & '+str(Tgas)+',-1 & / & '+str(ab)+',-1 & '+str(redshift)+',-1 & 0 & 1,-1 \n')
-        if Kcor:
-            txtfile.write('flux '+str(float(emin*(1+redshift)))+' '+str(float(emax*(1+redshift)))+' \n')
-        else:
-            txtfile.write('flux '+str(float(emin))+' '+str(float(emax))+' \n')
+        txtfile.write('flux '+str(float(emin))+' '+str(float(emax))+' \n')
 
         # Get the rate given a response file
         if resp_file != None and data_file != None:
@@ -196,7 +192,7 @@ def make_xspec_file(nH, Tgas, ab, redshift, emin, emax,
 # Create model
 #==================================================
 
-def run_xspec(nH, Tgas, ab, redshift, emin, emax, Kcor=False,
+def run_xspec(nH, Tgas, ab, redshift, emin, emax,
               file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
               model='APEC', resp_file=None, data_file=None, app_nH_model=False,
               cleanup=True):
@@ -211,7 +207,6 @@ def run_xspec(nH, Tgas, ab, redshift, emin, emax, Kcor=False,
     - redshift (float) cluster redshift
     - emin (float): minimal band energy (keV)
     - emax (float): maximal band energy (keV)
-    - Kcor (bool): apply K-correction
     - filename (str): file name to be created
     - model (str): which model to use
     - resp_file (str): full path to the response file of e.g., ROSAT PSPC
@@ -228,7 +223,7 @@ def run_xspec(nH, Tgas, ab, redshift, emin, emax, Kcor=False,
 
     """
 
-    make_xspec_file(nH, Tgas, ab, redshift, emin, emax, Kcor=Kcor, filename=file_ana, model=model,
+    make_xspec_file(nH, Tgas, ab, redshift, emin, emax, filename=file_ana, model=model,
                     resp_file=resp_file, data_file=data_file, app_nH_model=app_nH_model)
     
     if os.path.isfile(file_out): os.remove(file_out)
@@ -250,9 +245,8 @@ def run_xspec(nH, Tgas, ab, redshift, emin, emax, Kcor=False,
 
 def xray_spectrum(nH, Tgas, ab, redshift,
                   emin=0.5, emax=10.0, nbin=100,
-                  Kcor=False,
                   file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
-                  model='APEC', cleanup=True,
+                  model='APEC', resp_file=None, data_file=None, cleanup=True,
                   logspace=True):
     """
     Compute an xray spectrum given a model.
@@ -266,10 +260,13 @@ def xray_spectrum(nH, Tgas, ab, redshift,
     - emin (float): minimal band energy (keV), for observer
     - emax (float): maximal band energy (keV), for observer
     - nbin (int): number of bins
-    - Kcor (bool): apply K-correction
     - file_ana (str): xspec analysis file name to be created
     - file_out (str): xspec analysis output file name to be created
     - model (str): which model to use
+    - resp_file (str): full path to the response file of e.g., ROSAT PSPC
+    - data_file (str): full path to any data spectrum file needed for template in xspec 
+    (see https://heasarc.gsfc.nasa.gov/FTP/rosat/doc/xselect_guide/xselect_guide_v1.1.1/xselect_ftools.pdf,
+    section 5)
     - cleanup (bool): clean the temporary file
     - logspace (bool): scale for the energy binning
 
@@ -286,11 +283,6 @@ def xray_spectrum(nH, Tgas, ab, redshift,
         epot = np.logspace(np.log10(emin), np.log10(emax), nbin+1)
     else:
         epot = np.linspace(emin, emax, nbin+1)
-
-    if Kcor:
-        epot_rf = epot*(1+redshift) # Rest frame energy used for computing
-    else:
-        epot_rf = epot
                 
     ectr = ((epot+np.roll(epot,-1))/2.0)[0:-1]
     esiz = (np.roll(epot,-1) - epot)[0:-1]
@@ -299,9 +291,10 @@ def xray_spectrum(nH, Tgas, ab, redshift,
     dSB  = np.zeros(len(ectr))
     dR   = np.zeros(len(ectr))
     for i in range(len(ectr)):
-        flux, counts, rate = run_xspec(nH, Tgas, ab, redshift, epot_rf[i], epot_rf[i+1], Kcor=False, 
+        flux, counts, rate = run_xspec(nH, Tgas, ab, redshift, epot[i], epot[i+1],
                                        file_ana=file_ana, file_out=file_out,
-                                       model=model, app_nH_model=True, cleanup=cleanup)
+                                       model=model, resp_file=resp_file, data_file=data_file,
+                                       app_nH_model=True, cleanup=cleanup)
         dNph[i] = counts / esiz[i]
         dSB[i]  = flux /   esiz[i]
         dR[i]   = rate /   esiz[i]
@@ -315,7 +308,6 @@ def xray_spectrum(nH, Tgas, ab, redshift,
 
 def make_xspec_table(output_file, nH, ab, redshift, emin, emax,
                      Tmin=0.1, Tmax=50, nbin=100,
-                     Kcor=False,
                      file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
                      model='APEC', resp_file=None, data_file=None, app_nH_model=False, cleanup=True,
                      logspace=True):
@@ -334,7 +326,6 @@ def make_xspec_table(output_file, nH, ab, redshift, emin, emax,
     - Tmin (float): minimal plasma temperature (keV)
     - Tmax (float): maximal plasma temperature (keV)
     - nbin (int): number of bins
-    - Kcor (bool): apply K-correction
     - file_ana (str): xspec analysis file name to be created
     - file_out (str): xspec analysis output file name to be created
     - model (str): which model to use
@@ -363,7 +354,7 @@ def make_xspec_table(output_file, nH, ab, redshift, emin, emax,
     
     # Loop over all temperature
     for i in range(nbin):
-        flux, counts, rate = run_xspec(nH, Tvec[i], ab, redshift, emin, emax, Kcor=Kcor, 
+        flux, counts, rate = run_xspec(nH, Tvec[i], ab, redshift, emin, emax,
                                        file_ana=file_ana, file_out=file_out,
                                        model=model, resp_file=resp_file, data_file=data_file,
                                        app_nH_model=app_nH_model, cleanup=cleanup)
@@ -375,7 +366,7 @@ def make_xspec_table(output_file, nH, ab, redshift, emin, emax,
     sfile = open(output_file, 'wb')
     sfile.writelines(['#nH = '+str(nH)+' 10^22 cm^2 ; abundance = '+str(ab)+
                       ' Zsun ; redshift = '+str(redshift)+
-                      ' ; energy=['+str(emin)+','+str(emax)+'] ; Kcor = '+str(Kcor)+
+                      ' ; energy=['+str(emin)+','+str(emax)+']'+
                       ' ; model = '+model+' ; Absorb in counts & flux = '+str(app_nH_model)+'\n'])
     sfile.writelines(['#Output normalized to 10^{-14} / (4\pi D_A^2 (1+z)^2) \int n_e n_p dV [cm^-5]\n'])
     sfile.writelines(['#T (keV)         ', '   ', 'Counts (ph/s/cm2)', '   ', 'Flux (erg/s/cm2) ', '   ', 'Rate (ph/s)'+'\n'])
