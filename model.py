@@ -41,7 +41,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     
     To do list
     ----------  
-    - Split in subclasses
     - Add extra primary electron population
     
     Attributes
