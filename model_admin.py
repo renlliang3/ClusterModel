@@ -387,25 +387,25 @@ class Admin(object):
 
         # Create a dataframe to store all spectra in a single fits table
         tab1  = Table()
-        tab1['Energy'] = Column(energy.to_value('GeV'), unit='GeV', description='Energy')
+        tab1['Energy'] = Column(energy.to_value('MeV'), unit='MeV', description='Energy')
 
         tab2  = Table()
         tab2['Frequency'] = Column(frequency.to_value('GHz'), unit='GHz', description='Frequency')
 
         tab3  = Table()
-        tab3['EnergyX'] = Column(energyX.to_value('keV'), unit='keV', description='Xray energy')
+        tab3['Energy'] = Column(energyX.to_value('keV'), unit='keV', description='Xray energy')
         
         #---------- proton spectrum
         eng, spec = self.get_crp_spectrum(energy, Rmax=Rmax)
-        tab1['CRp'] = Column(spec.to_value('GeV-1'), unit='GeV-1', description='Cosmic ray proton spectrum')
+        tab1['CRp'] = Column(spec.to_value('MeV-1'), unit='MeV-1', description='Cosmic ray proton spectrum')
         self._save_txt_file(self._output_dir+'/SPECTRA_cosmic_ray_proton.txt',
-                            eng.to_value('MeV'), spec.to_value('GeV-1'), 'energy (MeV)', 'spectrum (GeV-1)')
+                            eng.to_value('MeV'), spec.to_value('MeV-1'), 'energy (MeV)', 'spectrum (MeV-1)')
         
         #---------- electron spectrum
         eng, spec = self.get_cre_spectrum(energy, Rmax=Rmax)
-        tab1['CRe'] = Column(spec.to_value('GeV-1'), unit='GeV-1', description='Cosmic ray electron spectrum')
+        tab1['CRe'] = Column(spec.to_value('MeV-1'), unit='MeV-1', description='Cosmic ray electron spectrum')
         self._save_txt_file(self._output_dir+'/SPECTRA_cosmic_ray_electron.txt',
-                            eng.to_value('MeV'), spec.to_value('GeV-1'), 'energy (MeV)', 'spectrum (GeV-1)')
+                            eng.to_value('MeV'), spec.to_value('MeV-1'), 'energy (MeV)', 'spectrum (MeV-1)')
         
         #---------- gamma spectrum
         eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical')
