@@ -2058,7 +2058,7 @@ class Observables(object):
                                                                 resp_file=resp_file,
                                                                 data_file=data_file,
                                                                 cleanup=True, logspace=True)
-
+        
         # Normalization
         xspec_norm = (1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2) * N2int).to_value('cm-5')
         

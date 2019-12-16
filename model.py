@@ -76,8 +76,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - Rmin (quantity): the minimum radius used to define integration arrays
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
     - X_cr_E (dict): the cosmic ray to thermal energy and the radius used for normalization
-    - nuclear_enhancement (bool): compute the pion model with/without nuclear enhancement 
-    from local abundances
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
@@ -182,7 +180,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Rmin = 1.0*u.kpc
         self._hse_bias = 0.2
         self._X_cr_E = {'X':0.01, 'R_norm':self._R500}
-        self._nuclear_enhancement = True
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
@@ -321,11 +318,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Getting the cosmic ray / thermal energy and normalization radius")
         return self._X_cr_E
 
-    @property
-    def nuclear_enhancement(self):
-        if not self._silent: print("Getting the nuclear enhancement")
-        return self._nuclear_enhancement
-    
     @property
     def Epmin(self):
         if not self._silent: print("Getting the minimal proton energy")
@@ -743,18 +735,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting cosmic ray to thermal pressure ratio value")
 
-    @nuclear_enhancement.setter
-    def nuclear_enhancement(self, value):
-        # Check type
-        if type(value) != bool :
-            raise TypeError("The nuclear_enhancement should be a boolean")
-        
-        # Implement
-        self._nuclear_enhancement = value
-        
-        # Information
-        if not self._silent: print("Setting nuclear_enhancement value")
-        
     @Epmin.setter
     def Epmin(self, value):
         # Check type
