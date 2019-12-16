@@ -252,8 +252,8 @@ class Plots(object):
     def plot(self, prod_list=['all'],
              radius=np.logspace(0,4,100)*u.kpc,
              energy=np.logspace(-2,7,100)*u.GeV,
-             energyX=np.linspace(0.1,50,100)*u.keV,
-             frequency=np.logspace(-3,3,100)*u.GHz,
+             energyX=np.linspace(0.1,20,100)*u.keV,
+             frequency=np.logspace(-2,3,100)*u.GHz,
              Epmin=None, Epmax=None,
              Eemin=None, Eemax=None,
              freq0=1*u.GHz,
@@ -362,7 +362,7 @@ class Plots(object):
 
             # Thermal energy
             rad, prof = self.get_thermal_energy_profile(radius)
-            profile(radius, angle, prof.to('erg'), self._output_dir+'/PLOT_PROF_thermal_energy.pdf',
+            profile(radius, angle, prof.to('erg'), self._output_dir+'/PLOT_PROF_gas_thermal_energy.pdf',
                     label='Thermal energy (erg)', R500=self._R500)
             if not self._silent: print('----- Plot done: thermal energy')
 
@@ -472,42 +472,46 @@ class Plots(object):
         if 'all' in prod_list or 'spectra' in prod_list:
             # CR protons
             eng, spec = self.get_crp_spectrum(energy, Rmax=Rmax)
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'), self._output_dir+'/PLOT_SPEC_CRproton.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
+            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
+                    self._output_dir+'/PLOT_SPEC_CRproton.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRp spectrum')
 
             # CR electrons
             eng, spec = self.get_cre_spectrum(energy, Rmax=Rmax)
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'), self._output_dir+'/PLOT_SPEC_CRelectron.pdf', label='Volume integrated CRe (GeV$^{-1}$)')
+            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
+                    self._output_dir+'/PLOT_SPEC_CRelectron.pdf', label='Volume integrated CRe (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRe spectrum')
 
             # gamma
             eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical')
-            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'), self._output_dir+'/PLOT_SPEC_gamma.pdf',
+            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
+                    self._output_dir+'/PLOT_SPEC_gamma.pdf',
                     label='$F_{\\gamma}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: gamma spectrum')
 
             # Gamma integrated flux spectrum
             spec = self.get_gamma_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical')
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'), self._output_dir+'/PLOT_SPEC_gammaF.pdf',
-                    label='$\\gamma$-ray flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
+            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'),
+                    self._output_dir+'/PLOT_SPEC_gammaF.pdf', label='$\\gamma$-ray flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: gamma integrated flux (E)')
 
             # neutrino
             eng, spec = self.get_neutrino_spectrum(energy, Rmax=Rmax, type_integral='spherical', flavor='all')
-            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'), self._output_dir+'/PLOT_SPEC_neutrino.pdf',
-                    label='$F_{\\nu}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
+            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
+                    self._output_dir+'/PLOT_SPEC_neutrino.pdf', label='$F_{\\nu}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: neutrino spectrum')
             
             # neutrino integrated flux spectrum
-            spec = self.get_neutrino_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical', flavor='all')
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'), self._output_dir+'/PLOT_SPEC_neutrinoF.pdf',
-                    label='$\\nu$ flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
+            spec = self.get_neutrino_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical',
+                                          flavor='all')
+            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'),
+                    self._output_dir+'/PLOT_SPEC_neutrinoF.pdf',label='$\\nu$ flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: neutrino integrated flux (E)')
 
             # IC
             eng, spec = self.get_ic_spectrum(energy, Rmax=Rmax, type_integral='spherical')
-            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'), self._output_dir+'/PLOT_SPEC_InverseCompton.pdf',
-                    label='$F_{IC}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
+            spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
+                    self._output_dir+'/PLOT_SPEC_InverseCompton.pdf',label='$F_{IC}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: IC spectrum')
 
             # IC integrated flux spectrum
@@ -564,7 +568,7 @@ class Plots(object):
             if not self._silent: print('----- Plot done: Synchrotron map')
 
             # SZ ymap
-            image = self.get_sz_map(Compton_only=True).to_value('adu')
+            image = self.get_sz_map(Compton_only=True, Normalize=False).to_value('adu')
             maps(image*1e6, header, self._output_dir+'/PLOT_MAP_SZy.pdf',
                  label='Compton parameter $\\times 10^{6}$', coord=self._coord, theta_500=self._theta500,
                  theta_trunc=self._theta_truncation, logscale=True)
