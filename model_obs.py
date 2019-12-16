@@ -76,7 +76,7 @@ class Observables(object):
                            Rmin=None, Rmax=None,
                            type_integral='spherical',
                            Rmin_los=None, NR500_los=5.0,
-                           Kcor=True):
+                           Cframe=False):
         """
         Compute the gamma ray emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the gamma ray emmission enclosed within an circular area (i.e.
@@ -92,7 +92,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -105,10 +105,10 @@ class Observables(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
 
         # K-correction
-        if Kcor:
-            energy_rf = energy*(1+self._redshift)
-        else:
+        if Cframe:
             energy_rf = energy*1.0
+        else:
+            energy_rf = energy*(1+self._redshift)
         
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
@@ -126,7 +126,7 @@ class Observables(object):
         # Compute the integral
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma_ray(energy_rf, rad)
+            dN_dEdVdt = self.get_rate_gamma(energy_rf, rad)
             dN_dEdt = model_tools.spherical_integration(dN_dEdVdt, rad)
             
         # Compute the integral        
@@ -136,14 +136,14 @@ class Observables(object):
             r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma_ray(energy_rf, r3d)
+            dN_dEdVdt = self.get_rate_gamma(energy_rf, r3d)
             dN_dEdt = model_tools.cylindrical_integration(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
         
         # From intrinsic luminosity to flux
         dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
 
         # Apply EBL absorbtion
-        if self._EBL_model != 'none':
+        if self._EBL_model != 'none' and not Cframe:
             absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdSdt = dN_dEdSdt * absorb
         
@@ -157,7 +157,7 @@ class Observables(object):
     def get_gamma_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                           Emin=None, Emax=None, Energy_density=False,
                           Rmin_los=None, NR500_los=5.0,
-                          Kcor=True):
+                          Cframe=False):
         """
         Compute the gamma ray emission profile within Emin-Emax.
         
@@ -170,7 +170,7 @@ class Observables(object):
         the number density is computed.
         - Rmin_los (quantity): minimal radius at which l.o.s integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -193,20 +193,20 @@ class Observables(object):
 
         # Define energy and K correction
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        if Kcor:
-            eng_rf = eng*(1+self._redshift)
-        else:
+        if Cframe:
             eng_rf = eng*1.0
+        else:
+            eng_rf = eng*(1+self._redshift)
 
         # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
         Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdVdt = self.get_rate_gamma_ray(eng_rf, r3d)
+        dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d)
 
         # Apply EBL absorbtion
-        if self._EBL_model != 'none':
+        if self._EBL_model != 'none' and not Cframe:
             absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
             
@@ -240,7 +240,7 @@ class Observables(object):
                        Rmin=None, Rmax=None,
                        type_integral='spherical',
                        Rmin_los=None, NR500_los=5.0,
-                       Kcor=True):
+                       Cframe=False):
         
         """
         Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -263,7 +263,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -298,7 +298,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
             # Integrate over it and return
             flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
@@ -308,7 +308,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(np.amin(Emin.value)*Emin.unit, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
             # Integrate over it and return
             if Energy_density:
@@ -328,10 +328,10 @@ class Observables(object):
         if type(Rmax.value) == np.ndarray:
             # Get energy integration
             eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-            if Kcor:
-                eng_rf = eng*(1+self._redshift)
-            else:
+            if Cframe:
                 eng_rf = eng*1.0
+            else:
+                eng_rf = eng*(1+self._redshift)
                 
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
@@ -341,10 +341,10 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma_ray(eng_rf, r3d)
+            dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d)
 
             # Apply EBL absorbtion
-            if self._EBL_model != 'none':
+            if self._EBL_model != 'none' and not Cframe:
                 absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
                 dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
 
@@ -398,7 +398,7 @@ class Observables(object):
                       Rmin_los=None, NR500_los=5.0,
                       Rmin=None, Rmax=None,
                       Energy_density=False, Normalize=False,
-                      Kcor=True):
+                      Cframe=False):
         """
         Compute the gamma ray map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -419,7 +419,7 @@ class Observables(object):
         Has no effect if Normalized is True
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -447,7 +447,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_gamma_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
-                                                 Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                 Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -466,7 +466,7 @@ class Observables(object):
             if Rmin is None:
                 Rmin = self._Rmin
             flux = self.get_gamma_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los,
-                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density, Kcor=Kcor)
+                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density, Cframe=Cframe)
             gamma_map = gamma_map / flux
             gamma_map = gamma_map.to('sr-1')
 
@@ -488,7 +488,7 @@ class Observables(object):
                               type_integral='spherical',
                               Rmin_los=None, NR500_los=5.0,
                               flavor='all',
-                              Kcor=True):
+                              Cframe=False):
         """
         Compute the neutrino emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the neutrino emmission enclosed within an circular area (i.e.
@@ -505,7 +505,7 @@ class Observables(object):
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
         - flavor (str): either 'all', 'numu' or 'nue'
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -518,10 +518,10 @@ class Observables(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
 
         # K-correction
-        if Kcor:
-            energy_rf = energy*(1+self._redshift)
-        else:
+        if Cframe:
             energy_rf = energy*1.0
+        else:
+            energy_rf = energy*(1+self._redshift)
         
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
@@ -566,7 +566,7 @@ class Observables(object):
                              Emin=None, Emax=None, Energy_density=False,
                              Rmin_los=None, NR500_los=5.0,
                              flavor='all',
-                             Kcor=True):
+                             Cframe=False):
         """
         Compute the neutrino emission profile within Emin-Emax.
         
@@ -580,7 +580,7 @@ class Observables(object):
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         - flavor (str): either 'all', 'numu' or 'nue'
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -603,10 +603,10 @@ class Observables(object):
 
         # Define energy and K correction
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        if Kcor:
-            eng_rf = eng*(1+self._redshift)
-        else:
+        if Cframe:
             eng_rf = eng*1.0
+        else:
+            eng_rf = eng*(1+self._redshift)
         
         # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
@@ -646,7 +646,7 @@ class Observables(object):
                           type_integral='spherical',
                           Rmin_los=None, NR500_los=5.0,
                           flavor='all',
-                          Kcor=True):
+                          Cframe=False):
         
         """
         Compute the neutrino emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -669,7 +669,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -705,7 +705,7 @@ class Observables(object):
             energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_neutrino_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
                                                            type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los,
-                                                           flavor=flavor, Kcor=Kcor)
+                                                           flavor=flavor, Cframe=Cframe)
 
             # Integrate over it and return
             flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
@@ -716,7 +716,7 @@ class Observables(object):
             energy = model_tools.sampling_array(np.amin(Emin.value)*Emin.unit, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_neutrino_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
                                                            type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los,
-                                                           flavor=flavor, Kcor=Kcor)
+                                                           flavor=flavor, Cframe=Cframe)
 
             # Integrate over it and return
             if Energy_density:
@@ -735,10 +735,10 @@ class Observables(object):
         if type(Rmax.value) == np.ndarray:
             # Get energy integration
             eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-            if Kcor:
-                eng_rf = eng*(1+self._redshift)
-            else:
+            if Cframe:
                 eng_rf = eng*1.0
+            else:
+                eng_rf = eng*(1+self._redshift)
             
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
@@ -749,11 +749,6 @@ class Observables(object):
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             dN_dEdVdt = self.get_rate_neutrino(eng_rf, r3d)
-
-            # Apply EBL absorbtion
-            if self._EBL_model != 'none':
-                absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
-                dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
 
             # Compute energy integal
             dN_dVdt = model_tools.energy_integration(dN_dEdVdt, eng, Energy_density=Energy_density)
@@ -806,7 +801,7 @@ class Observables(object):
                          Rmin=None, Rmax=None,
                          Energy_density=False, Normalize=False,
                          flavor='all',
-                         Kcor=True):
+                         Cframe=False):
         """
         Compute the neutrino map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -828,7 +823,7 @@ class Observables(object):
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
         - flavor (str): either 'all', 'numu' or 'nue'
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -856,7 +851,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_neutrino_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
-                                                    Rmin_los=Rmin_los, NR500_los=NR500_los, flavor=flavor, Kcor=Kcor)
+                                                    Rmin_los=Rmin_los, NR500_los=NR500_los, flavor=flavor, Cframe=Cframe)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -875,7 +870,7 @@ class Observables(object):
             if Rmin is None:
                 Rmin = self._Rmin
             flux = self.get_neutrino_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los,
-                                          Emin=Emin, Emax=Emax, Energy_density=Energy_density, flavor=flavor, Kcor=Kcor)
+                                          Emin=Emin, Emax=Emax, Energy_density=Energy_density, flavor=flavor, Cframe=Cframe)
             nu_map = nu_map / flux
             nu_map = nu_map.to('sr-1')
 
@@ -897,7 +892,7 @@ class Observables(object):
                         Rmin=None, Rmax=None,
                         type_integral='spherical',
                         Rmin_los=None, NR500_los=5.0,
-                        Kcor=True):
+                        Cframe=False):
         """
         Compute the inverse Compton emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the inverse Compton emmission enclosed within an circular area (i.e.
@@ -919,7 +914,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -932,10 +927,10 @@ class Observables(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
 
         # K-correction
-        if Kcor:
-            energy_rf = energy*(1+self._redshift)
-        else:
+        if Cframe:
             energy_rf = energy*1.0
+        else:
+            energy_rf = energy*(1+self._redshift)
         
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
@@ -970,7 +965,7 @@ class Observables(object):
         dN_dEdSdt = dN_dEdt / (4*np.pi * self._D_lum**2)
 
         # Apply EBL absorbtion
-        if self._EBL_model != 'none':
+        if self._EBL_model != 'none' and not Cframe:
             absorb = cluster_spectra.get_ebl_absorb(energy.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdSdt = dN_dEdSdt * absorb
         
@@ -984,7 +979,7 @@ class Observables(object):
     def get_ic_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                        Emin=None, Emax=None, Energy_density=False,
                        Rmin_los=None, NR500_los=5.0,
-                       Kcor=True):
+                       Cframe=False):
         """
         Compute the inverse Compton emission profile within Emin-Emax.
         
@@ -997,7 +992,7 @@ class Observables(object):
         the number density is computed.
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1020,10 +1015,10 @@ class Observables(object):
 
         # Define energy and K correction
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        if Kcor:
-            eng_rf = eng*(1+self._redshift)
-        else:
+        if Cframe:
             eng_rf = eng*1.0
+        else:
+            eng_rf = eng*(1+self._redshift)
         
         # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
@@ -1033,7 +1028,7 @@ class Observables(object):
         dN_dEdVdt = self.get_rate_ic(eng_rf, r3d)
 
         # Apply EBL absorbtion
-        if self._EBL_model != 'none':
+        if self._EBL_model != 'none' and not Cframe:
             absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
             dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
             
@@ -1066,7 +1061,7 @@ class Observables(object):
                     Rmin=None, Rmax=None,
                     type_integral='spherical',
                     Rmin_los=None, NR500_los=5.0,
-                    Kcor=True):
+                    Cframe=False):
         
         """
         Compute the inverse Compton emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -1089,7 +1084,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1124,7 +1119,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_ic_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
             # Integrate over it and return
             flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
@@ -1134,7 +1129,7 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(np.amin(Emin.value)*Emin.unit, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_ic_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                     type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
             # Integrate over it and return
             if Energy_density:
@@ -1153,10 +1148,10 @@ class Observables(object):
         if type(Rmax.value) == np.ndarray:
             # Get energy integration
             eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-            if Kcor:
-                eng_rf = eng*(1+self._redshift)
-            else:
+            if Cframe:
                 eng_rf = eng*1.0
+            else:
+                eng_rf = eng*(1+self._redshift)
             
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
@@ -1169,7 +1164,7 @@ class Observables(object):
             dN_dEdVdt = self.get_rate_ic(eng_rf, r3d)
 
             # Apply EBL absorbtion
-            if self._EBL_model != 'none':
+            if self._EBL_model != 'none' and not Cframe:
                 absorb = cluster_spectra.get_ebl_absorb(eng.to_value('GeV'), self._redshift, self._EBL_model)
                 dN_dEdVdt = dN_dEdVdt * model_tools.replicate_array(absorb, len(r3d), T=True)
 
@@ -1223,7 +1218,7 @@ class Observables(object):
                    Rmin_los=None, NR500_los=5.0,
                    Rmin=None, Rmax=None,
                    Energy_density=False, Normalize=False,
-                   Kcor=True):
+                   Cframe=False):
         """
         Compute the inverse Compton map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -1244,7 +1239,7 @@ class Observables(object):
         Has no effect if Normalized is True
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1272,7 +1267,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_ic_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
-                                              Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                              Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -1291,7 +1286,7 @@ class Observables(object):
             if Rmin is None:
                 Rmin = self._Rmin
             flux = self.get_ic_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los,
-                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density, Kcor=Kcor)
+                                       Emin=Emin, Emax=Emax, Energy_density=Energy_density, Cframe=Cframe)
             ic_map = ic_map / flux
             ic_map = ic_map.to('sr-1')
 
@@ -1312,7 +1307,7 @@ class Observables(object):
                                  Rmin=None, Rmax=None,
                                  type_integral='spherical',
                                  Rmin_los=None, NR500_los=5.0,
-                                 Kcor=True):
+                                 Cframe=False):
         """
         Compute the synchrotron emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the synchrotron emmission enclosed within a circular area (i.e.
@@ -1328,7 +1323,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1342,10 +1337,10 @@ class Observables(object):
         energy = (const.h * frequency).to('eV')
 
         # K-correction
-        if Kcor:
-            energy_rf = energy*(1+self._redshift)
-        else:
+        if Cframe:
             energy_rf = energy*1.0
+        else:
+            energy_rf = energy*(1+self._redshift)
         
         # Check the type of integral
         ok_list = ['spherical', 'cylindrical']
@@ -1389,7 +1384,7 @@ class Observables(object):
     def get_synchrotron_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                                 freq0=1*u.GHz,
                                 Rmin_los=None, NR500_los=5.0,
-                                Kcor=True):
+                                Cframe=False):
         """
         Compute the synchrotron emission profile at frequency freq0.
         
@@ -1399,7 +1394,7 @@ class Observables(object):
         - freq0 (quantity): the frequency at which the profile is computed
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1418,10 +1413,10 @@ class Observables(object):
 
         # Define energy and K correction
         eng0 = (freq0 * const.h).to('eV')
-        if Kcor:
-            eng0_rf = eng0*(1+self._redshift)
-        else:
+        if Cframe:
             eng0_rf = eng0*1.0
+        else:
+            eng0_rf = eng0*(1+self._redshift)
 
         # Define array for integration
         Rmax3d = np.sqrt((NR500_los*self._R500)**2 + Rmax**2)        
@@ -1454,7 +1449,7 @@ class Observables(object):
                              Rmin=None, Rmax=None,
                              type_integral='spherical',
                              Rmin_los=None, NR500_los=5.0,
-                             Kcor=True):
+                             Cframe=False):
         
         """
         Compute the synchrotron emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -1472,7 +1467,7 @@ class Observables(object):
         This is used only for cylindrical case
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1496,16 +1491,16 @@ class Observables(object):
         #----- Case of scalar quantities
         if type(Rmax.value) == float:
             freq0, flux = self.get_synchrotron_spectrum(freq0, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
         
         #----- Case of radius array (need to use dN/dVdEdt and not get_profile because spherical flux)
         if type(Rmax.value) == np.ndarray:
             # Get frequency sampling
             eng0 = (freq0 * const.h).to('eV')
-            if Kcor:
-                eng0_rf = eng0*(1+self._redshift)
-            else:
+            if Cframe:
                 eng0_rf = eng0*1.0
+            else:
+                eng0_rf = eng0*(1+self._redshift)
             
             if type_integral == 'spherical':
                 Rmax3d = np.amax(Rmax.value)*Rmax.unit
@@ -1555,7 +1550,7 @@ class Observables(object):
                             Rmin_los=None, NR500_los=5.0,
                             Rmin=None, Rmax=None,
                             Normalize=False,
-                            Kcor=True):
+                            Cframe=False):
         """
         Compute the synchrotron map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -1571,7 +1566,7 @@ class Observables(object):
         Has no effect if Normalized is False
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -1599,7 +1594,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_synchrotron_profile(radius, freq0=freq0, 
-                                                       Rmin_los=Rmin_los, NR500_los=NR500_los, Kcor=Kcor)
+                                                       Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -1617,7 +1612,7 @@ class Observables(object):
                     Rmax = NR500_los*self._R500
             if Rmin is None:
                 Rmin = self._Rmin
-            flux = self.get_synchrotron_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, freq0=freq0, Kcor=Kcor)
+            flux = self.get_synchrotron_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, freq0=freq0, Cframe=Cframe)
             synchrotron_map = synchrotron_map / flux
             synchrotron_map = synchrotron_map.to('sr-1')
 
@@ -1964,7 +1959,11 @@ class Observables(object):
                           type_integral='spherical',
                           Rmin_los=None, NR500_los=5.0,
                           output_type='C',
-                          Kcor=True):
+                          nH=0.0*u.cm**-2,
+                          model='APEC',
+                          resp_file=None,
+                          data_file=None,
+                          Cframe=False):
         """
         Compute the X-ray spectrum enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the SZ emmission enclosed within a circular area (i.e.
@@ -1984,7 +1983,8 @@ class Observables(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
-        - Kcor (bool): Apply the K correction (i.e. compute spectrum in rest frame energy)
+        - nH (quantity): hydrogen column density (homogeneous to cm**-2)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -2037,12 +2037,24 @@ class Observables(object):
             N2int = model_tools.trapz_loglog(2*np.pi*r2d*n_e2_proj, r2d)
             
         # Get the spectrum normalized to 1 cm-5
-        dSB, dNph, dR, ectr, epot = cluster_xspec.xray_spectrum(0.0, Tmean.to_value('keV'), self._abundance, self._redshift,
+        if Cframe:
+            z_xspec = 0.0
+        else:
+            z_xspec = self._redshift
+            
+        dSB, dNph, dR, ectr, epot = cluster_xspec.xray_spectrum(nH.to_value('cm-2')*1e-22,
+                                                                Tmean.to_value('keV'),
+                                                                self._abundance,
+                                                                z_xspec,
                                                                 emin=np.amin(energy.to_value('keV')),
-                                                                emax=np.amax(energy.to_value('keV')), nbin=len(energy),
-                                                                Kcor=Kcor,
-                                                                file_ana='./xspec_analysis.txt', file_out='./xspec_analysis_output.txt',
-                                                                model='APEC', cleanup=True, logspace=True)
+                                                                emax=np.amax(energy.to_value('keV')),
+                                                                nbin=len(energy),
+                                                                file_ana='./xspec_analysis.txt',
+                                                                file_out='./xspec_analysis_output.txt',
+                                                                model=model,
+                                                                resp_file=resp_file,
+                                                                data_file=data_file,
+                                                                cleanup=True, logspace=True)
 
         # Normalization
         xspec_norm = (1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2) * N2int).to_value('cm-5')
@@ -2064,12 +2076,12 @@ class Observables(object):
 
     def get_xray_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                          Rmin_los=None, NR500_los=5.0,
-                         output_type='C'):
+                         output_type='C',
+                         Cframe=False):
         
         """
         Get the Xray surface brightness profile. An xspec table file is needed as 
         output_dir+'/XSPEC_table.txt'. The energy band is defined in this file.
-        Kcorrection can be computed or not when running xspec table.
         
         Parameters
         ----------
@@ -2080,6 +2092,7 @@ class Observables(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -2111,7 +2124,7 @@ class Observables(object):
         Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dVdt = self.get_rate_xray(r3d, output_type=output_type).flatten()
+        dN_dVdt = self.get_rate_xray(r3d, output_type=output_type, Cframe=Cframe).flatten()
         
         # Compute integral over l.o.s.
         dN_dVdt_proj = model_tools.los_integration_1dfunc(dN_dVdt, r3d, radius, los)
@@ -2141,14 +2154,14 @@ class Observables(object):
     def get_xray_flux(self, Rmin=None, Rmax=None,
                       type_integral='spherical',
                       Rmin_los=None, NR500_los=5.0,
-                      output_type='C'):
+                      output_type='C',
+                      Cframe=False):
         
         """
         Compute the Xray emission enclosed within Rmax, in 3d (i.e. spherically 
         integrated), or the Xray emmission enclosed within a circular area (i.e.
         cylindrical), and in a given band depending on Xspec file. The radius 
         max can be an array to get flux(<R).
-        Kcorrection can be computed or not when running xspec table.
 
         Parameters
         ----------
@@ -2164,6 +2177,7 @@ class Observables(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -2208,7 +2222,7 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dVdt = self.get_rate_xray(r3d, output_type=output_type).flatten()
+            dN_dVdt = self.get_rate_xray(r3d, output_type=output_type, Cframe=Cframe).flatten()
             
             # Define output
             if output_type == 'S':
@@ -2261,13 +2275,13 @@ class Observables(object):
     # Compute Xray map
     #==================================================
     def get_xray_map(self, Rmin_los=None, NR500_los=5.0,
-                      Rmin=None, Rmax=None,
-                      Normalize=False,
-                      output_type='C'):
+                     Rmin=None, Rmax=None,
+                     Normalize=False,
+                     output_type='C',
+                     Cframe=False):
         """
         Compute the Xray map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
-        Kcorrection can be computed or not when running xspec table.
 
         Parameters
         ----------
@@ -2282,6 +2296,7 @@ class Observables(object):
         S == energy counts in erg/s/cm^2/sr
         C == counts in ph/s/cm^2/sr
         R == count rate in ph/s/sr (accounting for instrumental response)
+        - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
 
         Outputs
         ----------
@@ -2313,7 +2328,7 @@ class Observables(object):
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
-        r_proj, profile = self.get_xray_profile(radius, Rmin_los=Rmin_los, NR500_los=NR500_los, output_type=output_type)
+        r_proj, profile = self.get_xray_profile(radius, Rmin_los=Rmin_los, NR500_los=NR500_los, output_type=output_type, Cframe=Cframe)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
@@ -2331,7 +2346,7 @@ class Observables(object):
                     Rmax = NR500_los*self._R500
             if Rmin is None:
                 Rmin = self._Rmin
-            flux = self.get_xray_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, output_type=output_type)
+            flux = self.get_xray_flux(Rmin=Rmin, Rmax=Rmax, type_integral='cylindrical', NR500_los=NR500_los, output_type=output_type, Cframe=Cframe)
             xray_map = xray_map / flux
             xray_map = xray_map.to('sr-1')
         else:
