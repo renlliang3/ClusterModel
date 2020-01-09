@@ -228,7 +228,6 @@ def run_xspec(nH, Tgas, ab, redshift, emin, emax,
     
     if os.path.isfile(file_out): os.remove(file_out)
     runXSPEC = 'xspec '+file_ana+' > '+file_out
-    runXSPEC = 'bougabouga > '+file_out
     os.system(runXSPEC)
 
     flux, counts, rate = get_xspec_flux(file_out)
