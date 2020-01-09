@@ -455,13 +455,15 @@ class Admin(object):
         self._save_txt_file(self._output_dir+'/SPECTRA_SZ.txt',
                             freq.to_value('GHz'), spec.to_value('Jy'), 'frequency (GHz)', 'spectrum (Jy)')
 
-        
         #---------- Xray spectrum
-        engX, spec = self.get_xray_spectrum(energyX, Rmax=Rmax, type_integral='spherical', output_type='C')
-        tab3['Xray'] = Column(spec.to_value('s-1 cm-2 keV-1'), unit='s-1 cm-2 keV-1', description='Xray spectrum')
-        self._save_txt_file(self._output_dir+'/SPECTRA_Xray.txt',
-                            engX.to_value('keV'), spec.to_value('s-1 cm-2 keV-1'), 'energy (keV)', 'spectrum (s-1 cm-2 keV-1)')
+        if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
 
+            engX, spec = self.get_xray_spectrum(energyX, Rmax=Rmax, type_integral='spherical', output_type='C')
+            tab3['Xray'] = Column(spec.to_value('s-1 cm-2 keV-1'), unit='s-1 cm-2 keV-1', description='Xray spectrum')
+            self._save_txt_file(self._output_dir+'/SPECTRA_Xray.txt',
+                                engX.to_value('keV'), spec.to_value('s-1 cm-2 keV-1'), 'energy (keV)', 'spectrum (s-1 cm-2 keV-1)')
+        else:
+            print('!!! WARNING: XSPEC_table.txt not generated, skip Xray observables')
             
         #========== Save the data frame in a single file as well
         tab1.meta['comments'] = ['Spectra are computed within '+str(Rmax.to_value('kpc'))+' kpc.']

@@ -532,13 +532,15 @@ class Plots(object):
                     label='$|F_{SZ}|$(<R, sph) (Jy)')
             if not self._silent: print('----- Plot done: SZ spectrum')
 
-           # Xray
-            engX, spec = self.get_xray_spectrum(energyX, Rmax=Rmax, type_integral='spherical', output_type='C')
-            spectra(engX.to('keV'), (engX/const.h).to('GHz'), spec.to('cm-2 s-1 keV-1'), self._output_dir+'/PLOT_SPEC_X.pdf',
-                    label='$S_{X}$(<R, sph) (cm$^{-2}$ s$^{-1}$ keV${-1}$)')
-            if not self._silent: print('----- Plot done: X spectrum')
-
-            
+            # Xray
+            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+                engX, spec = self.get_xray_spectrum(energyX, Rmax=Rmax, type_integral='spherical', output_type='C')
+                spectra(engX.to('keV'), (engX/const.h).to('GHz'), spec.to('cm-2 s-1 keV-1'), self._output_dir+'/PLOT_SPEC_X.pdf',
+                        label='$S_{X}$(<R, sph) (cm$^{-2}$ s$^{-1}$ keV${-1}$)')
+                if not self._silent: print('----- Plot done: Xray spectrum')
+            else:
+                print('!!! WARNING: XSPEC_table.txt not generated, skip Xray spectrum')
+                
         #---------- Map
         if 'all' in prod_list or 'map' in prod_list:
             header = self.get_map_header()
