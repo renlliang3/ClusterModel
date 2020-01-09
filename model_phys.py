@@ -388,6 +388,10 @@ class Physics(object):
         for i in range(len(radius)):
             rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            # To avoid ringing at Rtrunc, insert it if we are above
+            if np.amax(rad) > self._R_truncation:
+                rad = rad.insert(0, self._R_truncation)
+                rad.sort()
             rad, n_r = self.get_density_gas_profile(radius=rad)
             I_n_gas_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2*n_r, rad)
         
@@ -456,6 +460,10 @@ class Physics(object):
         for i in range(len(radius)):
             rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            # To avoid ringing at Rtrunc, insert it if we are above
+            if np.amax(rad) > self._R_truncation:
+                rad = rad.insert(0, self._R_truncation)
+                rad.sort()
             rad, p_r = self.get_pressure_gas_profile(radius=rad)
             Uth_r[i] = model_tools.trapz_loglog((3.0/2.0)*(mu_e/mu_gas) * 4*np.pi*rad**2 * p_r, rad)
                     
@@ -752,6 +760,10 @@ class Physics(object):
         for i in range(len(radius)):
             rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            # To avoid ringing at Rtrunc, insert it if we are above
+            if np.amax(rad) > self._R_truncation:
+                rad = rad.insert(0, self._R_truncation)
+                rad.sort()
             rad, e_cr = self.get_density_crp_profile(rad, Emin=Emin, Emax=Emax, Energy_density=True)
             Ucr_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2 * e_cr, rad)
 
