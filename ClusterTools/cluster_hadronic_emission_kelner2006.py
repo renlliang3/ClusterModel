@@ -3,6 +3,8 @@ This file contains the PPmodel class. It aims at computing
 the gamma, electron and neutrinos spectrum for hadronic interactions between 
 cosmic rays and ICM. It is based on Kelner et al. 2006, and compute spectra 
 given as dN/dEdVdt in GeV-1 cm-3 s-1.
+It is inspired by the Naima package.
+
 """
 
 #==================================================
