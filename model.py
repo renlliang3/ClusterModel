@@ -121,6 +121,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                  M500=1e15*u.Unit('Msun'),
                  cosmology=astropy.cosmology.Planck15,
                  silent=False,
+                 output_dir='./ClusterModel',
     ):
         """
         Initialize the cluster object. Several attributes of the class cannot 
@@ -136,6 +137,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         - M500 (quantity): the cluster mass 
         - cosmology (astropy.cosmology): the name of the cosmology to use.
         - silent (bool): set to true in order not to print informations when running 
+        - output_dir (str): where to save outputs
         
         """
         
@@ -145,7 +147,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         
         #---------- Admin
         self._silent     = silent
-        self._output_dir = './ClusterModel'
+        self._output_dir = output_dir
 
         #---------- Check that the cosmology is indeed a cosmology object
         if hasattr(cosmology, 'h') and hasattr(cosmology, 'Om0'):
