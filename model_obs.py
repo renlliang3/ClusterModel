@@ -1819,6 +1819,15 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
+
+            # Increase numerical precision by adding a point at R_truncation
+            if np.amax(r3d) > self._R_truncation:
+                r3d = r3d.insert(0, self._R_truncation)
+                r3d.sort()
+            if np.amax(los) > self._R_truncation:
+                los = los.insert(0, self._R_truncation)
+                los.sort()
+                
             dE_dtdVdfdO_f = self.get_rate_sz(freq0, r3d, Compton_only=Compton_only).flatten()
 
             # Define output
@@ -1830,13 +1839,14 @@ class Observables(object):
             # Case of spherical integral: direct volume integration
             itpl = interpolate.interp1d(r3d.to_value('kpc'), dE_dtdVdfdO_f.value, kind='linear')
             if type_integral == 'spherical':
-               for i in range(len(Rmax)):
-                   rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
-                   dE_dtdVdfdO_f_i = itpl(rad_i.to_value('kpc'))*dE_dtdVdfdO_f.unit
-                   if Compton_only:
-                       flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i)
-                   else:
-                       flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i) / self._D_ang**2*u.sr
+                for i in range(len(Rmax)):
+                    Rmax_i = np.amin([Rmax[i].to_value('kpc'), self._R_truncation.to_value('kpc')])*u.kpc # Avoid ringing from integration
+                    rad_i = model_tools.sampling_array(Rmin, Rmax_i, NptPd=self._Npt_per_decade_integ, unit=True)
+                    dE_dtdVdfdO_f_i = itpl(rad_i.to_value('kpc'))*dE_dtdVdfdO_f.unit
+                    if Compton_only:
+                        flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i)
+                    else:
+                        flux[i] = model_tools.spherical_integration(dE_dtdVdfdO_f_i, rad_i) / self._D_ang**2*u.sr
                 
             # Case of cylindrical integral
             if type_integral == 'cylindrical':
@@ -1844,11 +1854,12 @@ class Observables(object):
                 radius = model_tools.sampling_array(Rmin, np.amax(Rmax.value)*Rmax.unit, NptPd=self._Npt_per_decade_integ, unit=True)
                 dE_dtdVdfdO_f_proj = model_tools.los_integration_1dfunc(dE_dtdVdfdO_f, r3d, radius, los)
                 dE_dtdVdfdO_f_proj[radius > self._R_truncation] = 0
-        
+                
                 itpl = interpolate.interp1d(radius.to_value('kpc'), dE_dtdVdfdO_f_proj.value, kind='linear')
                 
                 for i in range(len(Rmax)):
-                    rad_i = model_tools.sampling_array(Rmin, Rmax[i], NptPd=self._Npt_per_decade_integ, unit=True)
+                    Rmax_i = np.amin([Rmax[i].to_value('kpc'), self._R_truncation.to_value('kpc')])*u.kpc # Avoid ringing from integration
+                    rad_i = model_tools.sampling_array(Rmin, Rmax_i, NptPd=self._Npt_per_decade_integ, unit=True)
                     dE_dtdVdfdO_f_proj_i = itpl(rad_i.value)*dE_dtdVdfdO_f_proj.unit
                     if Compton_only:
                         flux[i] = model_tools.trapz_loglog(2*np.pi*rad_i*dE_dtdVdfdO_f_proj_i, rad_i)
