@@ -707,15 +707,23 @@ class Physics(object):
         # In case the input is not an array
         energy = model_tools.check_qarray(energy, unit='GeV')
 
-        # define radius
+        # define the maximum radius
         if Rmax is None:
             Rmax = self._R500
                 
-        # Integrate over the considered volume
+        # Define the radius for integration
         rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
         rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdV = self.get_crp_2d(energy, rad)
 
+        # To improve precision around R_truncation in integration
+        if np.amax(rad) > self._R_truncation:
+            rad = rad.insert(0, self._R_truncation)
+            rad.sort()
+
+        # Get the differential spectrum/profile
+        dN_dEdV = self.get_crp_2d(energy, rad)
+        
+        # Integrate
         spectrum = model_tools.trapz_loglog(4*np.pi*rad**2 * dN_dEdV, rad)
 
         return energy, spectrum.to('GeV-1')
@@ -746,10 +754,10 @@ class Physics(object):
         # In case the input is not an array
         radius = model_tools.check_qarray(radius, unit='kpc')
 
-        # Define energy
-        if Emin is None:
+        # Define energy (going below/above Epmin/Epmax only introduces more integration error because of discountinuity)
+        if Emin is None or Emin < self._Epmin:
             Emin = self._Epmin
-        if Emax is None:
+        if Emax is None or Emax > self._Epmax:
             Emax = self._Epmax
         
         # Thermal energy
@@ -1032,7 +1040,7 @@ class Physics(object):
         if Emin is None:
             Emin = (const.m_e*const.c**2).to('GeV')
         if Emax is None:
-            Emax = self._Epmax        
+            Emax = self._Epmax
             
         # Integrate over the spectrum
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
@@ -1070,15 +1078,23 @@ class Physics(object):
         # In case the input is not an array
         energy = model_tools.check_qarray(energy, unit='GeV')
 
-        # define radius
+        # Define the radius for integration
         if Rmax is None:
             Rmax = self._R500
                 
         # Integrate over the considered volume
         rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
         rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
+
+        # To improve precision around R_truncation in integration
+        if np.amax(rad) > self._R_truncation:
+            rad = rad.insert(0, self._R_truncation)
+            rad.sort()
+
+        # Get the differential spectrum/profile
         dN_dEdV = self.get_cre_2d(energy, rad)
 
+        # Integrate
         spectrum = model_tools.trapz_loglog(4*np.pi*rad**2 * dN_dEdV, rad)
 
         return energy, spectrum.to('GeV-1')

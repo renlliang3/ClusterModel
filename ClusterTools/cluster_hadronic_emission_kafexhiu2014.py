@@ -175,7 +175,7 @@ class PPmodel(object):
                 spec[i] = norm*self._trapz_loglog(diffsigma * Jp, Ep)
 
         #---------- Case of 1D, without radius
-        else:            
+        else:
             if len(nH) != len(radius_input):
                 raise ValueError('nH should have the same size as radius_input')
             
@@ -190,7 +190,7 @@ class PPmodel(object):
             norm = const.c.to_value('cm/s') * nH.to_value('cm-3') * self._norm
             norm_grid = (np.tile(norm, [len(Egamma),1])).T
             spec = spec0 * norm_grid
-                    
+            
         return spec * u.GeV**(-1) * u.cm**(-3) * u.s**(-1)
 
     #========== Compute the electron spectrum
