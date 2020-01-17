@@ -619,7 +619,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
             test = value.to('kpc')
         except:
             raise TypeError("The radius Rmin should be a quantity homogeneous to kpc.")
-
+        
         # Set parameters
         self._Rmin = value
         
