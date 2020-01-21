@@ -1226,9 +1226,7 @@ class Observables(object):
         Parameters
         ----------
         - Emin (quantity): the lower bound for IC energy integration.
-        Has no effect if Normalized is True
         - Emax (quantity): the upper bound for IC energy integration
-        Has no effect if Normalized is True
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the integration will stop at NR500_los x R500
         - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
@@ -1558,7 +1556,6 @@ class Observables(object):
         Parameters
         ----------
         - freq0 (quantity): the frequency at wich we work
-        Has no effect if Normalized is True
         - Rmin_los (Quantity): the radius at which line of sight integration starts
         - NR500_los (float): the integration will stop at NR500_los x R500
         - Rmin, Rmax (quantity): the radius within with the spectrum is computed 
