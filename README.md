@@ -28,3 +28,19 @@
 - notebook :
 	Repository where to find Jupyter notebook used for validation/exemple. 
 
+## Install
+To install these tools, just fork the repository to your favorite location in your machine.
+The software depends on standard python package (non-exhaustive list yet):
+- astropy
+- numpy
+- scipy
+- pickle
+- pprint
+- os
+- re
+- matplotlib
+But also:
+- ebltable (see https://github.com/me-manu/ebltable)
+- healpy
+
+In the case of Xray outputs, it will be necessary to have the XSPEC software installed.
