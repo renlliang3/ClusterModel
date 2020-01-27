@@ -39,6 +39,7 @@ The software depends on standard python package (non-exhaustive list yet):
 - os
 - re
 - matplotlib
+
 But also:
 - ebltable (see https://github.com/me-manu/ebltable)
 - healpy
