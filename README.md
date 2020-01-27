@@ -44,4 +44,4 @@ But also:
 - ebltable (see https://github.com/me-manu/ebltable)
 - healpy
 
-In the case of Xray outputs, it will be necessary to have the XSPEC software installed.
+In the case of Xray outputs, it will be necessary to have the XSPEC software installed (https://heasarc.gsfc.nasa.gov/xanadu/xspec/).
