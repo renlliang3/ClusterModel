@@ -28,7 +28,7 @@
 - notebook :
 	Repository where to find Jupyter notebook used for validation/exemple. 
 
-## Install
+## Installation
 To install these tools, just fork the repository to your favorite location in your machine.
 The software depends on standard python package (non-exhaustive list yet):
 - astropy
