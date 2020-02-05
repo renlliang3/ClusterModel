@@ -32,7 +32,8 @@ from ClusterModel.ClusterTools import cluster_electron_emission
 #==================================================
 
 class Physics(object):
-    """ Physics class
+    """ 
+    Physics class
     This class searves as a parser to the main Cluster class, to 
     include the subclass Physics in this other file.
 
