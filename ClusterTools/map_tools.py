@@ -191,7 +191,7 @@ def get_radec_map(header):
     axis2 = np.arange(0, Naxis2)
     coord_y, coord_x = np.meshgrid(axis1, axis2, indexing='ij')
     world = w.wcs_pix2world(coord_x, coord_y, 0)
-
+    
     ra_map = world[0]
     dec_map = world[1]
     

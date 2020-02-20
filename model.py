@@ -841,7 +841,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
             raise TypeError("The magnetic field model should be a dictionary containing the name key and relevant parameters")
         
         # Continue if ok
-        print(value)
+        if not self._silent: print(value)
         Ppar = self._validate_profile_model_parameters(value, 'uG')
         self._magfield_model = Ppar
         
