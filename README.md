@@ -28,6 +28,10 @@
 - notebook :
 	Repository where to find Jupyter notebook used for validation/exemple. 
 
+## Environment
+To be compliant with other softwares developed in parallel, the code was made for python 2. Please make sure that you are in the correct environment when you run the code.
+In addition, the ClusterModel directory should be in your python path so it can be found.
+
 ## Installation
 To install these tools, just fork the repository to your favorite location in your machine.
 The software depends on standard python package (non-exhaustive list yet):
