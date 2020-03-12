@@ -4,8 +4,6 @@ Cluster object, definined by its physical properties and with  associated method
 to compute derived properties or observables. It focuses on the thermal and non-thermal 
 component of the clusters ICM.
 
-Test for new branch
-
 """
 
 #==================================================
