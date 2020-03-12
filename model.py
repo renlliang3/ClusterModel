@@ -2,7 +2,7 @@
 This file contains the Cluster class. It is dedicated to the construction of a 
 Cluster object, definined by its physical properties and with  associated methods
 to compute derived properties or observables. It focuses on the thermal and non-thermal 
-component of the clusters ICM.
+component of the clusters ICM. Hi this is hazal! 
 
 """
 
