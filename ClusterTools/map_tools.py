@@ -375,3 +375,34 @@ def get_healpix_dec_mask(dec_lim, nside):
     mask[wmask] = 1
 
     return mask
+
+
+#===================================================
+#========== Compute the radial profile of a map
+#===================================================
+def radial_profile(image, center, rms=None, radius=None, wcs=None, stat='GAUSSIAN'):
+    """
+    Compute the radial profile of an image
+
+    Parameters
+    ----------
+    - image (2D array) : 
+    - center (tupple) : 
+    - rms (2D array) :
+    - radius (1D array) :
+    - wcs (astropy WCS object) :
+    - Stat (string): 'GAUSSIAN', 'POISSON'
+
+    Outputs
+    --------
+    - radius:
+    - profile:
+    
+    """
+
+    
+
+
+
+    
+    return radius, profile
