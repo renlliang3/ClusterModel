@@ -375,3 +375,81 @@ def get_healpix_dec_mask(dec_lim, nside):
     mask[wmask] = 1
 
     return mask
+
+
+#===================================================
+#========== Compute the radial profile of a map
+#===================================================
+def radial_profile(image, center, stddev=None, header=None, binsize=1.0, stat='GAUSSIAN'):
+    """
+    Compute the radial profile of an image
+
+    Parameters
+    ----------
+    - image (2D array) : input map
+    - center (tupple) : coord along x and y. In case a header is given, these
+    are R.A. and Dec. in degrees, otherwise this is in pixel.
+    - stddev (2D array) : the standard deviation map. In case of Gaussian statistics,
+    this is the sigma of the gaussian noise distribution in each pixel. In case of 
+    Poisson statistics, we have stddev = sqrt(expected counts)
+    - header (string) : header that contains the astrometry
+    - binsize (float): the radial bin size, in degree if the header is provided and 
+    in pixel unit otherwise.
+    - Stat (string): 'GAUSSIAN', 'POISSON'
+
+    Outputs
+    --------
+    - r_ctr (1D array): the center of the radial bins
+    - p (1D array): the profile
+    - err (1D array): the uncertainty
+    
+    """
+
+    #----- Use constant weight if no stddev given
+    if stddev is None:
+        stddev = image*0+1.0
+        
+    #------ Get the radius map
+    if header is None:
+        y, x = np.indices((image.shape))
+        dist_map = np.sqrt((x-center[0])**2+(y-center[1])**2)  # in pixels
+    else:
+        ra_map, dec_map = get_radec_map(header)
+        dist_map = greatcircle(ra_map, dec_map, center[0], center[1]) # in deg
+    
+    dist_max = np.max(dist_map)
+    
+    #----- Compute the binning
+    Nbin = int(np.ceil(dist_max/binsize))
+    r_in  = np.linspace(0, dist_max, Nbin+1)
+    r_out = r_in + (np.roll(r_in, -1) - r_in)
+    r_in  = r_in[0:-1]
+    r_out = r_out[0:-1]
+
+    #----- Compute the profile
+    r_ctr = np.array([])
+    p     = np.array([])
+    err   = np.array([])
+    for i in range(Nbin):
+        r_ctr    = np.append(r_ctr, (r_in[i] + r_out[i])/2.0)
+        w_ok_rad =  (dist_map < r_out[i])*(dist_map >= r_in[i])
+        w_ok_val = (stddev > 0)*(np.isnan(stddev) == False)*(np.isnan(image) == False)
+        w_ok     = w_ok_rad*w_ok_val
+        Npix_ok  = np.sum(w_ok)
+
+        if stat == 'GAUSSIAN':
+            val     = np.sum((image/stddev**2)[w_ok]) / np.sum((1.0/stddev**2)[w_ok])
+            val_err = 1.0 / np.sqrt(np.sum((1.0/stddev**2)[w_ok]))
+
+        if stat == 'POISSON':
+            cts     = np.sum(image[w_ok])
+            cts_exp = np.sum((stddev**2)[w_ok]) # stddev**2 == model for poisson
+            cts_dat = cts + cts_exp
+            sig = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
+            val = cts/float(Npix_ok)
+            val_err = val/sig
+            
+        p       = np.append(p, val)
+        err     = np.append(err, val_err)
+        
+    return r_ctr, p, err
