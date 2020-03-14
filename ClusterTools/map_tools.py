@@ -380,7 +380,12 @@ def get_healpix_dec_mask(dec_lim, nside):
 #===================================================
 #========== Compute the radial profile of a map
 #===================================================
-def radial_profile(image, center, stddev=None, header=None, binsize=1.0, stat='GAUSSIAN'):
+def radial_profile(image, center,
+                   stddev=None,
+                   header=None,
+                   binsize=1.0,
+                   stat='GAUSSIAN',
+                   counts2brightness=False):
     """
     Compute the radial profile of an image
 
@@ -395,7 +400,10 @@ def radial_profile(image, center, stddev=None, header=None, binsize=1.0, stat='G
     - header (string) : header that contains the astrometry
     - binsize (float): the radial bin size, in degree if the header is provided and 
     in pixel unit otherwise.
-    - Stat (string): 'GAUSSIAN', 'POISSON'
+    - stat (string): 'GAUSSIAN' (for surface brightness like images), 
+    and 'POISSON' for counts
+    - counts2brightness (bool): set to true if you want to normalized by the solid
+    angle.
 
     Outputs
     --------
@@ -408,14 +416,26 @@ def radial_profile(image, center, stddev=None, header=None, binsize=1.0, stat='G
     #----- Use constant weight if no stddev given
     if stddev is None:
         stddev = image*0+1.0
-        
-    #------ Get the radius map
+        print('!!! WARNING: The stddev is set to 1 for each pixels.')
+        if stat == 'POISSON':
+            print('             For POISSON statistics, stddev should be sqrt(expected_value).')
+            print('             This affects only the uncertainty of the profile.')
+        if stat == 'GAUSSIAN':
+            print('             For GAUSSIAN statistics stddev is the noise standard deviation in each pixel.')
+            print('             This affects the profile uncertainty and is used for weights')
+            
+    #------ Get the distance from the center map
     if header is None:
         y, x = np.indices((image.shape))
         dist_map = np.sqrt((x-center[0])**2+(y-center[1])**2)  # in pixels
+        reso_x = 1.0 # pixel size in unit of pixel
+        reso_y = 1.0
     else:
         ra_map, dec_map = get_radec_map(header)
         dist_map = greatcircle(ra_map, dec_map, center[0], center[1]) # in deg
+        w = WCS(header)
+        reso_x = np.abs(w.wcs.cdelt[0]) # pixel size in unit of deg
+        reso_y = np.abs(w.wcs.cdelt[1])
     
     dist_max = np.max(dist_map)
     
@@ -431,25 +451,34 @@ def radial_profile(image, center, stddev=None, header=None, binsize=1.0, stat='G
     p     = np.array([])
     err   = np.array([])
     for i in range(Nbin):
-        r_ctr    = np.append(r_ctr, (r_in[i] + r_out[i])/2.0)
-        w_ok_rad =  (dist_map < r_out[i])*(dist_map >= r_in[i])
-        w_ok_val = (stddev > 0)*(np.isnan(stddev) == False)*(np.isnan(image) == False)
-        w_ok     = w_ok_rad*w_ok_val
-        Npix_ok  = np.sum(w_ok)
+        # Get the map pixels in the bin
+        w_bin_rad =  (dist_map < r_out[i]) * (dist_map >= r_in[i])
+        w_bin_val = (stddev > 0) * (np.isnan(stddev) == False) * (np.isnan(image) == False)
+        w_bin     = w_bin_rad * w_bin_val
+        Npix_bin  = np.sum(w_bin)
 
+        # Gaussian case (mean x Npix_bin == counts in bin)
         if stat == 'GAUSSIAN':
-            val     = np.sum((image/stddev**2)[w_ok]) / np.sum((1.0/stddev**2)[w_ok])
-            val_err = 1.0 / np.sqrt(np.sum((1.0/stddev**2)[w_ok]))
+            val     = Npix_bin*np.sum((image/stddev**2)[w_bin]) / np.sum((1.0/stddev**2)[w_bin])
+            val_err = Npix_bin / np.sqrt(np.sum((1.0/stddev**2)[w_bin]))
 
+        # Poisson case (mean x Npix_bin == counts in bin)
         if stat == 'POISSON':
-            cts     = np.sum(image[w_ok])
-            cts_exp = np.sum((stddev**2)[w_ok]) # stddev**2 == model for poisson
+            cts     = np.sum(image[w_bin])
+            cts_exp = np.sum((stddev**2)[w_bin]) # stddev**2 == model for poisson
             cts_dat = cts + cts_exp
-            sig = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
-            val = cts/float(Npix_ok)
+            sig     = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
+            val     = cts*1.0 # cts/pixel or cts/deg^2
             val_err = val/sig
-            
+
+        # Convert counts to counts per deg2 if needed
+        if counts2brightness:
+            val     /= (Npix_bin*reso_x*reso_y)
+            val_err /= (Npix_bin*reso_x*reso_y)
+
+        # Append the bin values
         p       = np.append(p, val)
         err     = np.append(err, val_err)
-        
+        r_ctr   = np.append(r_ctr, (r_in[i] + r_out[i])/2.0)
+
     return r_ctr, p, err
