@@ -459,22 +459,34 @@ def radial_profile(image, center,
 
         # Gaussian case (mean x Npix_bin == counts in bin)
         if stat == 'GAUSSIAN':
-            val     = Npix_bin*np.sum((image/stddev**2)[w_bin]) / np.sum((1.0/stddev**2)[w_bin])
-            val_err = Npix_bin / np.sqrt(np.sum((1.0/stddev**2)[w_bin]))
-
+            if Npix_bin > 0:
+                val     = Npix_bin*np.sum((image/stddev**2)[w_bin]) / np.sum((1.0/stddev**2)[w_bin])
+                val_err = Npix_bin / np.sqrt(np.sum((1.0/stddev**2)[w_bin]))
+            else:
+                val     = np.nan
+                val_err = np.nan
+                
         # Poisson case (mean x Npix_bin == counts in bin)
         if stat == 'POISSON':
-            cts     = np.sum(image[w_bin])
-            cts_exp = np.sum((stddev**2)[w_bin]) # stddev**2 == model for poisson
-            cts_dat = cts + cts_exp
-            sig     = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
-            val     = cts*1.0 # cts/pixel or cts/deg^2
-            val_err = val/sig
+            if Npix_bin > 0:
+                cts     = np.sum(image[w_bin])
+                cts_exp = np.sum((stddev**2)[w_bin]) # stddev**2 == model for poisson
+                cts_dat = cts + cts_exp
+                sig     = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
+                val     = cts*1.0 # cts/pixel or cts/deg^2
+                val_err = val/sig
+            else:
+                val     = 0.0 # cts/pixel or cts/deg^2
+                val_err = 0.0
 
         # Convert counts to counts per deg2 if needed
         if counts2brightness:
-            val     /= (Npix_bin*reso_x*reso_y)
-            val_err /= (Npix_bin*reso_x*reso_y)
+            if Npix_bin > 0:
+                val     /= (Npix_bin*reso_x*reso_y)
+                val_err /= (Npix_bin*reso_x*reso_y)
+            else:
+                val     = np.nan
+                val_err = np.nan
 
         # Append the bin values
         p       = np.append(p, val)
