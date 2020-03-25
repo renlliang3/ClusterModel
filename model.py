@@ -205,7 +205,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         #---------- Sampling
         self._Npt_per_decade_integ = 30
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
-        self._map_reso   = 0.02*u.deg
+        self._map_reso   = 0.01*u.deg
         self._map_fov    = [5.0, 5.0]*u.deg
         self._map_header = None
         
