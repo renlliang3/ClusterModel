@@ -2,8 +2,8 @@
                 |  \/  |_ _/ __| /_\ |   \ / _ \                
                 | |\/| || | (__ / _ \| |) | (_) |               
                 |_|  |_|___\___/_/ \_\___/ \___/                   
-		
  Modeling the Intra Cluster Atmosphere for Diverse Observations 
+ 
  
 # ClusterModel: package dedicated to provide a model of the thermal and non-thermal gas in the clusters. 
                                                             
