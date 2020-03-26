@@ -1,4 +1,5 @@
-# ClusterModel: package dedicated to provide a model of the thermal and non-thermal gas in the clusters. 
+# MICADO: Modeling the Intra Cluster Atmosphere for Diverse Observations
+Software dedicated to provide a model of the thermal and non-thermal gas in the clusters, multi-wavelenght modeling and observable predictions.
                                                             
 - model.py : 
 	main code that defines the class Cluster
