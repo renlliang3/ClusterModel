@@ -443,6 +443,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
@@ -847,6 +848,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
@@ -1261,6 +1263,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
@@ -1587,6 +1590,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
@@ -1919,6 +1923,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
@@ -2336,6 +2341,7 @@ class Observables(object):
             print('!!!!! WARNING: the cluster location is very much offset from the field of view')
         rmax = theta_max*np.pi/180 * self._D_ang
         rmin = theta_min*np.pi/180 * self._D_ang
+        if rmin == 0: rmin = self._Rmin
         radius = model_tools.sampling_array(rmin, rmax, NptPd=self._Npt_per_decade_integ, unit=True)
         
         # Project the integrand
