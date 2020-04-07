@@ -385,7 +385,8 @@ def radial_profile(image, center,
                    header=None,
                    binsize=1.0,
                    stat='GAUSSIAN',
-                   counts2brightness=False):
+                   counts2brightness=False,
+                   residual=True):
     """
     Compute the radial profile of an image
 
@@ -404,6 +405,8 @@ def radial_profile(image, center,
     and 'POISSON' for counts
     - counts2brightness (bool): set to true if you want to normalized by the solid
     angle.
+    - residual (bool): is the map a residual map? If yes, the data will be taken as 
+    residual+model in poisson counts 
 
     Outputs
     --------
@@ -471,8 +474,13 @@ def radial_profile(image, center,
             if Npix_bin > 0:
                 cts     = np.sum(image[w_bin])
                 cts_exp = np.sum((stddev**2)[w_bin]) # stddev**2 == model for poisson
-                cts_dat = cts + cts_exp
-                sig     = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*np.log(cts_dat/cts_exp) + cts_exp - cts_dat))
+                if residual:
+                    cts_dat = cts + cts_exp
+                else:
+                    cts_dat = cts + 0.0
+                log_ratio = np.log(np.float64(cts_dat)/np.float64(cts_exp)) # avoid 0 when dat~exp
+                if np.abs(log_ratio)==np.inf: log_ratio = 0
+                sig     = np.sign(cts_dat-cts_exp)*np.sqrt(2*(cts_dat*log_ratio+cts_exp-cts_dat))
                 val     = cts*1.0 # cts/pixel or cts/deg^2
                 val_err = val/sig
             else:
