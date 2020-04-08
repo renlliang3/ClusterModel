@@ -94,7 +94,7 @@ class Physics(object):
     
     - get_cre2_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the CRe population assuming equilibrium dN/dEdV versus energy and radius
-    - get_density_cre_profile(self, radius=np.logspace(0,4,100)*u.kpc,Emin=None, Emax=None, Energy_density=False):
+    - get_density_cre2_profile(self, radius=np.logspace(0,4,100)*u.kpc,Emin=None, Emax=None, Energy_density=False):
     compute the cosmic ray electron density profile integrating over the energy between Emin and Emax.
     - get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None): compute the cosmic ray electron
     spectrum integrating over the volume up to Rmax
@@ -1014,8 +1014,8 @@ class Physics(object):
     # Get the CR electron density profile
     #==================================================
     
-    def get_density_cre_profile(self, radius=np.logspace(0,4,100)*u.kpc,
-                                Emin=None, Emax=None, Energy_density=False):
+    def get_density_cre2_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                 Emin=None, Emax=None, Energy_density=False):
         """
         Compute the cosmic ray electron density profile, integrating energies 
         between Emin and Emax.

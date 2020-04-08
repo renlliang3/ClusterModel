@@ -251,8 +251,8 @@ class Admin(object):
                             radius.to_value('kpc'), prof.to_value('adu'),
                             'radius (kpc)', 'x')
 
-        #---------- Cosmic ray electron
-        rad, prof = self.get_density_cre_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
+        #---------- Cosmic ray electron secondaries
+        rad, prof = self.get_density_cre2_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
         tab['n_cre'] = Column(prof.to_value('cm-3'), unit='cm-3', description='Cosmic ray electron density')
         self._save_txt_file(self._output_dir+'/PROF_cre_density.txt',
                             radius.to_value('kpc'), prof.to_value('cm-3'), 'radius (kpc)', 'density (cm-3)')

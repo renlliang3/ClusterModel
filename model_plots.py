@@ -384,8 +384,8 @@ class Plots(object):
                     label='CRp to thermal energy $X_{CR}$', R500=self._R500)
             if not self._silent: print('----- Plot done: CRp/thermal energy')
 
-            # Cosmic ray electrons
-            rad, prof = self.get_density_cre_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
+            # Cosmic ray electrons secondaries
+            rad, prof = self.get_density_cre2_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
             profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_cre_density.pdf',
                     label='CRe density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: CRe density')
