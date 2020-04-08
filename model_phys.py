@@ -87,7 +87,7 @@ class Physics(object):
 
     - get_rate_gamma(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the gamma ray emission rate dN/dEdVdt versus energy and radius
-    - get_rate_cre(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    - get_rate_cre2(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the CRe production rate dN/dEdVdt versus energy and radius
     - get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc, flavor='all'):
     compute the neutrino production rate dN/dEdVdt versus energy and radius
@@ -834,7 +834,7 @@ class Physics(object):
     # Get the gamma ray production rate
     #==================================================
     
-    def get_rate_cre(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_cre2(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
@@ -986,7 +986,7 @@ class Physics(object):
                         np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
         emax = self._Epmax
         eng = model_tools.sampling_array(emin, emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdVdt = self.get_rate_cre(eng, radius) # This is the time consumming part
+        dN_dEdVdt = self.get_rate_cre2(eng, radius) # This is the time consumming part
         eng_grid = model_tools.replicate_array(eng, len(radius), T=True)
 
         # Integrated cumulatively over the energy
