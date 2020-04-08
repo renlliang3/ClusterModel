@@ -401,8 +401,8 @@ class Admin(object):
         self._save_txt_file(self._output_dir+'/SPECTRA_cosmic_ray_proton.txt',
                             eng.to_value('MeV'), spec.to_value('MeV-1'), 'energy (MeV)', 'spectrum (MeV-1)')
         
-        #---------- electron spectrum
-        eng, spec = self.get_cre_spectrum(energy, Rmax=Rmax)
+        #---------- secondary electron spectrum
+        eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
         tab1['CRe'] = Column(spec.to_value('MeV-1'), unit='MeV-1', description='Cosmic ray electron spectrum')
         self._save_txt_file(self._output_dir+'/SPECTRA_cosmic_ray_electron.txt',
                             eng.to_value('MeV'), spec.to_value('MeV-1'), 'energy (MeV)', 'spectrum (MeV-1)')

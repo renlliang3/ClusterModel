@@ -96,7 +96,7 @@ class Physics(object):
     compute the CRe population assuming equilibrium dN/dEdV versus energy and radius
     - get_density_cre2_profile(self, radius=np.logspace(0,4,100)*u.kpc,Emin=None, Emax=None, Energy_density=False):
     compute the cosmic ray electron density profile integrating over the energy between Emin and Emax.
-    - get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None): compute the cosmic ray electron
+    - get_cre2_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None): compute the cosmic ray electron
     spectrum integrating over the volume up to Rmax
     - get_rate_synchrotron(self, frequency=np.logspace(-3,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc):
     compute the synchrotron emission per unit volume given the electron population and magnetic field
@@ -1059,7 +1059,7 @@ class Physics(object):
     # Get the CR proton spectrum
     #==================================================
     
-    def get_cre_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None):
+    def get_cre2_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None):
         """
         Compute the cosmic ray proton spectrum, integrating radius 
         between 0 and Rmax.

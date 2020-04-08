@@ -477,7 +477,7 @@ class Plots(object):
             if not self._silent: print('----- Plot done: CRp spectrum')
 
             # CR electrons
-            eng, spec = self.get_cre_spectrum(energy, Rmax=Rmax)
+            eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
             spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
                     self._output_dir+'/PLOT_SPEC_CRelectron.pdf', label='Volume integrated CRe (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRe spectrum')
