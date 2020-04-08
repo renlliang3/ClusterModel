@@ -92,7 +92,7 @@ class Physics(object):
     - get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc, flavor='all'):
     compute the neutrino production rate dN/dEdVdt versus energy and radius
     
-    - get_cre_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    - get_cre2_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the CRe population assuming equilibrium dN/dEdV versus energy and radius
     - get_density_cre_profile(self, radius=np.logspace(0,4,100)*u.kpc,Emin=None, Emax=None, Energy_density=False):
     compute the cosmic ray electron density profile integrating over the energy between Emin and Emax.
@@ -953,7 +953,7 @@ class Physics(object):
     # Get the electron spectrum
     #==================================================
     
-    def get_cre_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_cre2_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the electron spectrum as dN/dEdV = f(E, r)
         The steady state solution is used:  dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
@@ -1045,7 +1045,7 @@ class Physics(object):
             
         # Integrate over the spectrum
         eng = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdV = self.get_cre_2d(eng, radius)
+        dN_dEdV = self.get_cre2_2d(eng, radius)
 
         if Energy_density:
             profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
@@ -1093,7 +1093,7 @@ class Physics(object):
             rad.sort()
 
         # Get the differential spectrum/profile
-        dN_dEdV = self.get_cre_2d(energy, rad)
+        dN_dEdV = self.get_cre2_2d(energy, rad)
 
         # Integrate
         spectrum = model_tools.trapz_loglog(4*np.pi*rad**2 * dN_dEdV, rad)
@@ -1128,7 +1128,7 @@ class Physics(object):
         radius, B   = self.get_magfield_profile(radius)
         
         # Parse the CRe distribution: returns call function[rad, energy] amd returns f[rad, energy]
-        def Je(rad, eng): return self.get_cre_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+        def Je(rad, eng): return self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
 
         # Define the model
         model = cluster_electron_emission.ClusterElectronEmission(Je,
@@ -1172,7 +1172,7 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Parse the CRe distribution: returns call function[rad, energy] amd returns f[rad, energy]
-        def Je(rad, eng): return self.get_cre_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+        def Je(rad, eng): return self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
 
         # Define the model
         model = cluster_electron_emission.ClusterElectronEmission(Je,
