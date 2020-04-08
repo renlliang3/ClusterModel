@@ -75,7 +75,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
     - Rmin (quantity): the minimum radius used to define integration arrays
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
-    - X_cr_E (dict): the cosmic ray to thermal energy and the radius used for normalization
+    - X_crp_E (dict): the cosmic ray to thermal energy and the radius used for normalization
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
@@ -181,7 +181,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         #---------- Physical properties
         self._Rmin = 1.0*u.kpc
         self._hse_bias = 0.2
-        self._X_cr_E = {'X':0.01, 'R_norm':self._R500}
+        self._X_crp_E = {'X':0.01, 'R_norm':self._R500}
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
@@ -316,9 +316,9 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         return self._hse_bias
     
     @property
-    def X_cr_E(self):
-        if not self._silent: print("Getting the cosmic ray / thermal energy and normalization radius")
-        return self._X_cr_E
+    def X_crp_E(self):
+        if not self._silent: print("Getting the cosmic ray protons / thermal energy and normalization radius")
+        return self._X_crp_E
 
     @property
     def Epmin(self):
@@ -709,11 +709,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting hydrostatic mass bias value")
 
-    @X_cr_E.setter
-    def X_cr_E(self, value):
+    @X_crp_E.setter
+    def X_crp_E(self, value):
         # Check type and content
         if type(value) != dict :
-            raise TypeError("The cosmic/thermal energy should be a dictionary as {'X':CR/th fraction, 'R_norm':enclosed radius}.")
+            raise TypeError("The CRp/thermal energy should be a dictionary as {'X':CR/th fraction, 'R_norm':enclosed radius}.")
 
         if 'X' in value.keys() and 'R_norm' in value.keys():
             # Check units and value
@@ -729,7 +729,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                 raise ValueError("The enclosed radius should be > 0")
             
             # Implement
-            self._X_cr_E = {'X':value['X'], 'R_norm':value['R_norm'].to('kpc')}
+            self._X_crp_E = {'X':value['X'], 'R_norm':value['R_norm'].to('kpc')}
             
         else:
             raise TypeError("The cosmic/thermal energy should be a dictionary as {'X':CR/th fraction, 'R_norm':enclosed radius}.")

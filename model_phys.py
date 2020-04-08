@@ -579,7 +579,7 @@ class Physics(object):
 
         """
 
-        Rcut = self._X_cr_E['R_norm']
+        Rcut = self._X_crp_E['R_norm']
         
         # Get the thermal energy
         rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
@@ -595,7 +595,7 @@ class Physics(object):
         Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
         
         # Compute the normalization
-        Norm = self._X_cr_E['X'] * U_th / Vcr / Ienergy
+        Norm = self._X_crp_E['X'] * U_th / Vcr / Ienergy
 
         return Norm.to('GeV-1 cm-3')
     
@@ -737,7 +737,7 @@ class Physics(object):
     def get_crp_to_thermal_energy_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                                            Emin=None, Emax=None):
         """
-        Compute the X_cr_E profile, i.e. the cosmic ray to thermal energy enclosed within R
+        Compute the X_crp_E profile, i.e. the cosmic ray to thermal energy enclosed within R
         profile.
         
         Parameters
