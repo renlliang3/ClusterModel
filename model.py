@@ -2,7 +2,7 @@
 This file contains the Cluster class. It is dedicated to the construction of a 
 Cluster object, definined by its physical properties and with  associated methods
 to compute derived properties or observables. It focuses on the thermal and non-thermal 
-component of the clusters ICM. Hi this is hazal! 
+component of the clusters ICM.
 
 """
 
@@ -39,11 +39,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     mass and redshift, it includes the physical properties (e.g. pressure profile, 
     cosmic ray spectrum) from which derived properties can be obtained (e.g. 
     hydrostatic mass profile) as well as observables.
-    
-    To do list
-    ----------  
-    - Add extra primary electron population
-    
+        
     Attributes
     ----------  
     - silent (bool): print information if False, or not otherwise.
@@ -76,8 +72,8 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
     - Rmin (quantity): the minimum radius used to define integration arrays
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
-    - X_crp_E (dict): the cosmic ray to thermal energy and the radius used for normalization
-    - X_cre1_E (dict): the cosmic ray electron to thermal energy and the radius used for normalization
+    - X_crp_E (dict): the cosmic ray proton to thermal energy and the radius used for normalization
+    - X_cre1_E (dict): the primary cosmic ray electron to thermal energy and the radius used for normalization
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
