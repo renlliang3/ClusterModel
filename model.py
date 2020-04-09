@@ -15,6 +15,7 @@ import astropy.units as u
 from astropy.io import fits
 import astropy.cosmology
 from astropy.coordinates import SkyCoord
+from astropy import constants as const
 from astropy.wcs import WCS
 
 from ClusterModel              import model_title
@@ -76,9 +77,12 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - Rmin (quantity): the minimum radius used to define integration arrays
     - hse_bias (float): the hydrostatic mass bias, as Mtrue = (1-b) Mhse
     - X_crp_E (dict): the cosmic ray to thermal energy and the radius used for normalization
+    - X_cre1_E (dict): the cosmic ray electron to thermal energy and the radius used for normalization
     - Epmin (quantity): the minimal energy of protons (default is the threshold energy for 
     pi0 production)
     - Epmax (quantity): the maximal energy of protons (default is 10 PeV)
+    - Eemin (quantity): the minimal energy of primary electrons (default is electron rest mass)
+    - Eemax (quantity): the maximal energy of primary electrons (default is 10 PeV) 
     - pp_interaction_model (str) : model for particle physics parametrisation of pp 
     interactions. Available are 'Pythia8', 'SIBYLL', 'QGSJET', 'Geant4'.
 
@@ -87,8 +91,10 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - density_gas_model (dict): the model used for the thermal gas electron density 
     profile. It contains the name of the model and the associated model parameters. 
     - density_crp_model (dict): the definition of the cosmic ray proton radial shape
+    - density_cre1_model (dict): the definition of the cosmic ray primary electron radial shape
     - magfield_model (dict): the definition of the magnetic field profile.
     - spectrum_crp_model (dict): the definition of the cosmic ray proton energy shape
+    - spectrum_cre1_model (dict): the definition of the cosmic ray primary electron energy shape
 
     - Npt_per_decade_integ (int): the number of point per decade used in integrations
     - map_coord (SkyCoord object): the map center coordinates.
@@ -182,8 +188,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Rmin = 1.0*u.kpc
         self._hse_bias = 0.2
         self._X_crp_E = {'X':0.01, 'R_norm':self._R500}
+        self._X_cre1_E = {'X':0.18, 'R_norm': self._R500}
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
+        self._Eemin = (const.m_e *const.c**2).to('GeV')
+        self._Eemax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
 
         # Initialize the profile model (not useful but for clarity of variables)
@@ -202,6 +211,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                                     'PivotEnergy': 1.0*u.TeV,
                                     'Index'      : 2.5}
         
+	# Cosmic ray primary electrons
+	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
+                                    'PivotEnergy': 1.0*u.TeV,
+                                    'Index'      : 3.8}
+
         #---------- Sampling
         self._Npt_per_decade_integ = 30
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
@@ -321,6 +335,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         return self._X_crp_E
 
     @property
+    def X_cre1_E(self):
+        if not self._silent: print("Getting the cosmic ray primary electrons / thermal energy and normalization radius")
+        return self._X_cre1_E
+
+    @property
     def Epmin(self):
         if not self._silent: print("Getting the minimal proton energy")
         return self._Epmin
@@ -329,6 +348,16 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     def Epmax(self):
         if not self._silent: print("Getting the maximal proton energy")
         return self._Epmax
+
+    @property
+    def Eemin(self):
+        if not self._silent: print("Getting the minimal electron energy")
+        return self._Eemin
+
+    @property
+    def Eemax(self):
+        if not self._silent: print("Getting the maximal electron energy")
+        return self._Eemax
 
     @property
     def pp_interaction_model(self):
@@ -351,6 +380,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         return self._density_crp_model
 
     @property
+    def density_cre1_model(self):
+        if not self._silent: print("Getting the cosmic ray primary electron density profile model value")
+        return self._density_cre1_model
+
+    @property
     def magfield_model(self):
         if not self._silent: print("Getting the magnetic field profile parameters value")
         return self._magfield_model
@@ -359,6 +393,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     def spectrum_crp_model(self):
         if not self._silent: print("Getting the cosmic ray proton spectrum parameters value")
         return self._spectrum_crp_model
+
+    @property
+    def spectrum_cre1_model(self):
+        if not self._silent: print("Getting the cosmic ray primary electron spectrum parameters value")
+        return self._spectrum_cre1_model
     
     #========== Maps parameters
     @property
@@ -773,6 +812,70 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting Epmax value")
 
+    @X_cre1_E.setter
+    def X_cre1_E(self, value):
+        # Check type and content
+        if type(value) != dict :
+            raise TypeError("The CRe/thermal energy should be a dictionary as {'X':CRe/th fraction, 'R_norm':enclosed radius}.")
+
+        if 'X' in value.keys() and 'R_norm' in value.keys():
+            # Check units and value
+            try:
+                test = value['R_norm'].to('kpc')
+            except:
+                raise TypeError("R_norm should be homogeneous to kpc")
+            
+            if value['X'] < 0:
+                raise ValueError("The cosmic ray to thermal pressure ratio X should be >= 0")
+            
+            if value['R_norm'].to_value('kpc') <= 0:
+                raise ValueError("The enclosed radius should be > 0")
+            
+            # Implement
+            self._X_cre1_E = {'X':value['X'], 'R_norm':value['R_norm'].to('kpc')}
+            
+        else:
+            raise TypeError("The cosmic/thermal energy should be a dictionary as {'X':CRe/th fraction, 'R_norm':enclosed radius}.")
+        
+        # Information
+        if not self._silent: print("Setting cosmic ray to thermal pressure ratio value")
+
+    @Eemin.setter
+    def Eemin(self, value):
+        # Check type
+        try:
+            test = value.to('GeV')
+        except:
+            raise TypeError("The minimal electron energy sould be a quantity homogeneous to GeV.")
+
+        # Value check
+        if value <= 0 :
+            raise ValueError("Energy Epmin should be larger than 0")
+        
+        # Setting parameters
+        self._Epmin = value
+        
+        # Information
+        if not self._silent: print("Setting Eemin value")
+        
+    @Eemax.setter
+    def Eemax(self, value):
+        # Check type
+        try:
+            test = value.to('GeV')
+        except:
+            raise TypeError("The maximal electron energy sould be a quantity homogeneous to GeV.")
+
+        # Value check
+        if value <= 0 :
+            raise ValueError("Energy Eemax should be larger than 0")
+        
+        # Setting parameters
+        self._Epmax = value
+        
+        # Information
+        if not self._silent: print("Setting Eemax value")
+
     @pp_interaction_model.setter
     def pp_interaction_model(self, value):
         # Check type
@@ -834,6 +937,20 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Setting density_crp_model value")
         if not self._silent: print("Fixing: R500")
 
+    @density_cre1_model.setter
+    def density_cre1_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The density CRe1 model should be a dictionary containing the name key and relevant parameters")
+        
+        # Continue if ok
+        Ppar = self._validate_profile_model_parameters(value, '')
+        self._density_cre1_model = Ppar
+        
+        # Information
+        if not self._silent: print("Setting density_cre1_model value")
+        if not self._silent: print("Fixing: R500")
+
     @magfield_model.setter
     def magfield_model(self, value):
         # check type
@@ -861,6 +978,19 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
         # Information
         if not self._silent: print("Setting spectrum_crp_model value")
+
+    @spectrum_cre1_model.setter
+    def spectrum_cre1_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The spectrum CRe1 model should be a dictionary containing the name key and relevant parameters")
+
+        # Continue if ok
+        Spar = self._validate_spectrum_model_parameters(value, '')
+        self._spectrum_cre1_model = Spar
+
+        # Information
+        if not self._silent: print("Setting spectrum_cre1_model value")
 
     #========== Sampling
     @Npt_per_decade_integ.setter
