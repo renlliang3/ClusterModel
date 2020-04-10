@@ -184,7 +184,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Rmin = 1.0*u.kpc
         self._hse_bias = 0.2
         self._X_crp_E = {'X':0.01, 'R_norm':self._R500}
-        self._X_cre1_E = {'X':0.186, 'R_norm': self._R500}
+        self._X_cre1_E = {'X':0.01, 'R_norm': self._R500}
         self._Epmin = cluster_spectra.pp_pion_kinematic_energy_threshold() * u.GeV
         self._Epmax = 10.0 * u.PeV
         self._Eemin = (const.m_e *const.c**2).to('GeV')
@@ -212,8 +212,8 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         
 	# Cosmic ray primary electrons
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
-                                    'PivotEnergy': 1.0*u.TeV,
-                                    'Index'      : 3.8}
+                                     'PivotEnergy': 1.0*u.TeV,
+                                     'Index'      : 3.0}
 
         #---------- Sampling
         self._Npt_per_decade_integ = 30
@@ -398,7 +398,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         if not self._silent: print("Getting the cosmic ray primary electron spectrum parameters value")
         return self._spectrum_cre1_model
 
- 
     #========== Maps parameters
     @property
     def Npt_per_decade_integ(self):
