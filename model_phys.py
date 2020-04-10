@@ -544,8 +544,7 @@ class Physics(object):
         return radius, n_r.to('adu')
 
 
-
-    def get_normed_density_cre1_profile(self, radius = np.logspace(0,4,100)*u.kpc):
+    def get_normed_density_cre1_profile(self, radius=np.logspace(0,4,100)*u.kpc):
         """
         Get the normalized cosmic ray primary electron density profile.
         
@@ -561,7 +560,7 @@ class Physics(object):
         """    
 
         # In case the input is not an array
-        radius = model_tools.check_qarray(radius, unit = 'kpc')
+        radius = model_tools.check_qarray(radius, unit='kpc')
 
         # get profile
         n_r = self._get_generic_profile(radius, self._density_cre1_model)
@@ -570,7 +569,6 @@ class Physics(object):
         return radius, n_r.to('adu')
 
  
-
     #==================================================
     # Get normalized CR spectrum
     #==================================================
@@ -601,7 +599,7 @@ class Physics(object):
         return energy, S_E*u.adu
 
 
-    def get_normed_cre1_spectrum(self , energy = np.logspace(-2,7,100)*u.GeV): 
+    def get_normed_cre1_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV): 
         """
         Get the normalized cosmic ray primary electron spectrum.
         
@@ -616,14 +614,13 @@ class Physics(object):
 
         """
 
-        energy = model_tools.check_qarray(energy, unit= 'GeV')
+        energy = model_tools.check_qarray(energy, unit='GeV')
     
         S_E = self._get_generic_spectrum(energy, self._spectrum_cre1_model)
         S_E[energy > self._Eemax] *= 0
         S_E[energy < self._Eemin] *= 0
     
         return energy, S_E*u.adu
-
 
 
     #==================================================
@@ -666,7 +663,6 @@ class Physics(object):
 
         return Norm.to('GeV-1 cm-3')
     
-
 
     #==================================================
     # Get the CR primary electron normalization
@@ -749,34 +745,41 @@ class Physics(object):
         return spectrum.to('GeV-1 cm-3')
 
 
-
-
     #==================================================
     # Get the CR primary electron 2d distribution
     #==================================================
 
+    def get_cre1_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+        """
+        Compute the cosmic ray primary electron 2d distribution.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR protons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
 
-    def get_cre1_2d(self, energy= np.logspace(-2,7,100)*u.GeV, radius =np.logspace(0,4,100)*u.kpc):
+        Outputs
+        ----------
+        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
 
+        """
 
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')   
 
-        norm = self._get_cre1_normalization()
-        #From fit, it is norm = (2.07162116e-14)/u.GeV/u.cm**3
+        norm = self._get_cre1_normalization() #From fit, it is norm = (2.07162116e-14)/u.GeV/u.cm**3
+        
         # Integrate over the considered volume
         rad, f_r = self.get_normed_density_cre1_profile(radius)
         f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T = False )
-        #energy
+        
+        # energy
         eng, f_E = self.get_normed_cre1_spectrum(energy)
         f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T = True )
     
         spectrum= norm * f_E2 * f_r2
      
-
         return spectrum.to('GeV-1 cm-3')
-
-
 
 
     #==================================================
@@ -873,7 +876,6 @@ class Physics(object):
         return radius, profile
 
 
-
     #==================================================
     # Get the CR proton spectrum
     #==================================================
@@ -920,11 +922,9 @@ class Physics(object):
         return energy, spectrum.to('GeV-1')
     
 
-
     #==================================================
     # Get the CR primary electron spectrum
     #==================================================
-
 
     def get_cre1_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV, Rmax=None):
         """
@@ -957,7 +957,7 @@ class Physics(object):
             rad = rad.insert(0, self._R_truncation)
             rad.sort()
 
-        #Get the differential spectrum/profile
+        # Get the differential spectrum/profile
         dN_dEdV = self.get_cre1_2d(energy, rad)
         
         # Integrate
@@ -1417,7 +1417,16 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Parse the CRe distribution: returns call function[rad, energy] amd returns f[rad, energy]
-        def Je(rad, eng): return self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+        def Je(rad, eng):
+            if self._X_crp_E['X'] == 0: 
+                Sec_e = 0
+            else: 
+                Sec_e = self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+            if self._X_cre1_E['X'] == 0: 
+                Pri_e = 0
+            else: 
+                Pri_e = self.get_cre1_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T           	
+            return Pri_e + Sec_e
 
         # Define the model
         model = cluster_electron_emission.ClusterElectronEmission(Je,
