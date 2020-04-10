@@ -666,6 +666,49 @@ class Physics(object):
 
         return Norm.to('GeV-1 cm-3')
     
+
+
+    #==================================================
+    # Get the CR primary electron normalization
+    #==================================================
+
+    def _get_cre1_normalization(self):
+        """
+        Compute the normalization of the cosmic ray primary electron distribution:
+        dN/dE/dV = Norm f(E) f(r)
+        with f(E) the spectral form and f(r) the spatial form
+        Norm is in unit of GeV-1 cm-3
+        
+        Parameters
+        ----------
+
+        Outputs
+        ----------
+        - Norm (quantity): in unit of GeV-1 cm-3
+
+        """
+
+        Rcut = self._X_cre1_E['R_norm']
+        
+        # Get the thermal energy
+        rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
+        
+        # Get the spatial form volume for CRp
+        rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
+        rad, f_cr_r = self.get_normed_density_cre1_profile(rad)
+        Vcr = model_tools.trapz_loglog(4*np.pi*rad**2 * f_cr_r.to_value('adu'), rad)
+        
+        # Get the energy enclosed in the spectrum
+        eng = model_tools.sampling_array(self._Eemin, self._Eemax, NptPd=self._Npt_per_decade_integ, unit=True)
+        eng, f_cr_E = self.get_normed_cre1_spectrum(eng)
+        Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
+        
+        # Compute the normalization
+        Norm = self._X_cre1_E['X'] * U_th / Vcr / Ienergy
+
+        return Norm.to('GeV-1 cm-3')
+
+
     #==================================================
     # Get the CR proton 2d distribution
     #==================================================
@@ -719,7 +762,8 @@ class Physics(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')   
 
-        norm = (2.07162116e-14)/u.GeV/u.cm**3
+        norm = self._get_cre1_normalization()
+        #From fit, it is norm = (2.07162116e-14)/u.GeV/u.cm**3
         # Integrate over the considered volume
         rad, f_r = self.get_normed_density_cre1_profile(radius)
         f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T = False )
@@ -1320,7 +1364,16 @@ class Physics(object):
         radius, B   = self.get_magfield_profile(radius)
         
         # Parse the CRe distribution: returns call function[rad, energy] amd returns f[rad, energy]
-        def Je(rad, eng): return self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+        def Je(rad, eng):
+            if self._X_crp_E['X'] == 0: 
+                Sec_e = 0
+            else: 
+                Sec_e = self.get_cre2_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
+            if self._X_cre1_E['X'] == 0: 
+                Pri_e = 0
+            else: 
+                Pri_e = self.get_cre1_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T           	
+            return Pri_e + Sec_e
 
         # Define the model
         model = cluster_electron_emission.ClusterElectronEmission(Je,
