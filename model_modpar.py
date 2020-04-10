@@ -37,7 +37,9 @@ class Modpar(object):
     - set_pressure_gas_isoT_param(self, kBT): set gas pressure profile parameters so that the cluster is isothermal
     - set_density_gas_isoT_param(self, kBT): set gas density profile parameters so that the cluster is isothermal
     - set_density_crp_isobaric_scal_param(self, scal=1.0): set CRp densitry profile parameters to have isobaric scaling
+    - set_density_cre1_isobaric_scal_param(self, scal=1.0): set CRe1 densitry profile parameters to have isobaric scaling
     - set_density_crp_isodens_scal_param(self, scal=1.0): set CRp densitry profile parameters to have isodensity scaling
+    - set_density_cre1_isodens_scal_param(self, scal=1.0): set CRe1 densitry profile parameters to have isodensity scaling
     - set_magfield_isobaric_scal_param(self, Bnorm, scal=0.5): set mag field profile parameters to have isobaric scaling
     - set_magfield_isodens_scal_param(self, Bnorm, scal=0.5): set mag field profile parameters to have isodensity scaling
     
@@ -546,6 +548,54 @@ class Modpar(object):
 
         self._density_crp_model = Ppar
 
+    #==================================================
+    # Set a given CRe1 density to isobaric profile
+    #==================================================
+    
+    def set_density_cre1_isobaric_scal_param(self, scal=1.0):
+        """
+        Set the parameters of the CRe1 density profile to 
+        have isobaric conditions, i.e. CRp pressure over
+        thermal pressure is constant.
+        
+        Parameters
+        ----------
+        scal (float): the scaling slope, n_CRe1 ~ P^scal
+
+        """
+
+        # Get the density parameters
+        Ppar = self._pressure_gas_model.copy()
+
+        # Modify the parameters depending on the model
+        if self._pressure_gas_model['name'] == 'GNFW':
+            Ppar['P_0'] = 1.0*u.adu
+            Ppar['b'] *= scal
+            Ppar['c'] *= scal
+            
+        elif self._pressure_gas_model['name'] == 'SVM':
+            Ppar['n_0'] = 1.0*u.adu
+            Ppar['beta'] *= scal
+            Ppar['alpha'] *= scal
+            Ppar['epsilion'] *= scal
+            
+        elif self._pressure_gas_model['name'] == 'beta':
+            Ppar['n_0'] = 1.0*u.adu
+            Ppar['beta'] *= scal
+            
+        elif self._pressure_gas_model['name'] == 'doublebeta':
+            maxnorm = np.amax([Ppar['n_01'].to_value('keV cm-3'), Ppar['n_02'].to_value('keV cm-3')])
+            Ppar['n_01'] = Ppar['n_01'].to_value('keV cm-3') / maxnorm *u.adu
+            Ppar['n_02'] = Ppar['n_02'].to_value('keV cm-3') / maxnorm *u.adu
+
+            if scal != 1.0:
+                # In this case we have p = p1+p2 -> (p1+p2)^scal, so scal cannot be applied to individual profile
+                raise ValueError('Transformation not available with doublebeta model for scal != 1.')
+        else:
+            raise ValueError('Problem with density model list.')
+
+        self._density_cre1_model = Ppar
+
 
     #==================================================
     # Set a given CRp density to isodensity profile
@@ -594,6 +644,56 @@ class Modpar(object):
             raise ValueError('Problem with density model list.')
 
         self._density_crp_model = Ppar
+
+
+    #==================================================
+    # Set a given CRe1 density to isodensity profile
+    #==================================================
+    
+    def set_density_cre1_isodens_scal_param(self, scal=1.0):
+        """
+        Set the parameters of the CRe1 density profile to 
+        have isodensity conditions, i.e. CRp density over
+        thermal density is constant.
+        
+        Parameters
+        ----------
+        scal (float): the scaling slope, n_CRe1 ~ n_th^scal
+
+        """
+
+        # Get the density parameters
+        Ppar = self._density_gas_model.copy()
+
+        # Modify the parameters depending on the model
+        if self._density_gas_model['name'] == 'GNFW':
+            Ppar['P_0'] = 1.0*u.adu
+            Ppar['b'] *= scal
+            Ppar['c'] *= scal
+            
+        elif self._density_gas_model['name'] == 'SVM':
+            Ppar['n_0'] = 1.0*u.adu
+            Ppar['beta'] *= scal
+            Ppar['alpha'] *= scal
+            Ppar['epsilion'] *= scal
+            
+        elif self._density_gas_model['name'] == 'beta':
+            Ppar['n_0'] = 1.0*u.adu
+            Ppar['beta'] *= scal
+            
+        elif self._density_gas_model['name'] == 'doublebeta':
+            maxnorm = np.amax([Ppar['n_01'].to_value('cm-3'), Ppar['n_02'].to_value('cm-3')])
+            Ppar['n_01'] = Ppar['n_01'].to_value('cm-3') / maxnorm *u.adu
+            Ppar['n_02'] = Ppar['n_02'].to_value('cm-3') / maxnorm *u.adu
+
+            if scal != 1.0:
+                # In this case we have p = p1+p2 -> (p1+p2)^scal, so scal cannot be applied to individual profile
+                raise ValueError('Transformation not available with doublebeta model for scal != 1.')
+        else:
+            raise ValueError('Problem with density model list.')
+
+        self._density_cre1_model = Ppar
+
 
 
     #==================================================
