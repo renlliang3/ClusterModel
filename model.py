@@ -91,7 +91,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - magfield_model (dict): the definition of the magnetic field profile.
     - spectrum_crp_model (dict): the definition of the cosmic ray proton energy shape
     - spectrum_cre1_model (dict): the definition of the cosmic ray primary electron energy shape
-
+    - density_cre1_model ; temporary
     - Npt_per_decade_integ (int): the number of point per decade used in integrations
     - map_coord (SkyCoord object): the map center coordinates.
     - map_reso (quantity): the map pixel size, homogeneous to degrees.
@@ -195,6 +195,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._pressure_gas_model = 1
         self._density_gas_model  = 1
         self._density_crp_model  = 1
+	self._density_cre1_model = 1
         self._magfield_model     = 1
         # Set default model using UPP + isoThermal + isobaric
         self.set_pressure_gas_gNFW_param(pressure_model='P13UPP')
@@ -211,6 +212,12 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
                                     'PivotEnergy': 1.0*u.TeV,
                                     'Index'      : 3.8}
+
+        
+        self._density_cre1_model = {'name': 'beta', 
+                                   'n_0':3e-3*u.cm**-3, 
+                                   'beta':2.0/3,
+                                   'r_c':290*u.kpc}
 
         #---------- Sampling
         self._Npt_per_decade_integ = 30
@@ -394,6 +401,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     def spectrum_cre1_model(self):
         if not self._silent: print("Getting the cosmic ray primary electron spectrum parameters value")
         return self._spectrum_cre1_model
+
+    @property
+    def density_cre1_model(self):
+        if not self._silent: print("Getting the cosmic ray primary electron density parameters value")
+        return self._density_cre1_model
     
     #========== Maps parameters
     @property
@@ -987,6 +999,15 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
         # Information
         if not self._silent: print("Setting spectrum_cre1_model value")
+
+    @density_cre1_model.setter
+    def density_cre1_model(self, value):
+        # check type
+        if type(value) != dict :
+            raise TypeError("The density CRe1 model should be a dictionary containing the name key and relevant parameters")
+
+        # Information
+        if not self._silent: print("Setting density_cre1_model value")
 
     #========== Sampling
     @Npt_per_decade_integ.setter
