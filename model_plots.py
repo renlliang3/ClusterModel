@@ -394,7 +394,7 @@ class Plots(object):
             # Cosmic ray electrons primaries
             rad, prof = self.get_density_cre1_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
             profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_cre1_density.pdf',
-                    label='CRe2 density (cm$^{-3}$)', R500=self._R500)
+                    label='CRe1 density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: CRe1 density')
             
             # Gamma ray profile
@@ -485,7 +485,7 @@ class Plots(object):
             # CR electrons secondaries
             eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
             spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    self._output_dir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe1 (GeV$^{-1}$)')
+                    self._output_dir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe2 (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRe2 spectrum')
 
             # CR electrons primaries
