@@ -19,7 +19,7 @@ class Modpar(object):
     model parameters should be here.
 
     Profile models are now:  ['GNFW', 'SVM', 'beta', 'doublebeta']
-    Spectral models are now: ['PowerLaw', 'ExponentialCutoffPowerLaw']
+    Spectral models are now: ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw]
 
     Attributes
     ----------  
@@ -299,7 +299,7 @@ class Modpar(object):
         """
         
         # List of available authorized models
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
         
         # Deal with unit
         if unit == '' or unit == None:
@@ -353,7 +353,19 @@ class Modpar(object):
             outpar = {"name"        : 'ExponentialCutoffPowerLaw',
                       "Index"       : inpar['Index'],
                       "CutoffEnergy": inpar['CutoffEnergy'].to('TeV')}
-                    
+
+
+        #---------- Deal with the case of MomentumPowerLaw
+        if inpar['name'] == 'MomentumPowerLaw':
+            # Check the content of the dictionary
+            cond1 = 'Index' in inpar.keys() 
+            if not cond1:
+                raise ValueError("The MomentumPowerLawModel model should contain: {'Index'}.")
+  
+            # All good at this stage, setting parameters
+            outpar = {"name" : 'MomentumPowerLaw',
+                      "Index": inpar['Index']}
+                  
         return outpar
 
         
@@ -924,7 +936,7 @@ class Modpar(object):
 
         """
 
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
 
         if not model['name'] in model_list:
             print('The spectral model can :')
@@ -943,6 +955,11 @@ class Modpar(object):
             index   = model["Index"]
             Ecut   = model["CutoffEnergy"].to_value('GeV')
             S_E = cluster_spectra.exponentialcutoffpowerlaw_model(eng_GeV, 1.0, index, Ecut)
+
+        #----------
+        elif model['name'] == 'MomentumPowerLaw':
+            index  =model["Index"]
+            S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index)
 
         #---------- Otherwise nothing is done
         else :
