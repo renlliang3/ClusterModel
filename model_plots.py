@@ -382,7 +382,7 @@ class Plots(object):
             # Cosmic ray proton to thermal energy
             rad, prof = self.get_crp_to_thermal_energy_profile(radius, Emin=Epmin, Emax=Epmax)
             profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_crp_fraction.pdf',
-                    label='CRp to thermal energy $X_{CR}$', R500=self._R500)
+                    label='CRp to thermal energy $X_{CRp}$', R500=self._R500)
             if not self._silent: print('----- Plot done: CRp/thermal energy')
 
             # Cosmic ray electrons secondaries
