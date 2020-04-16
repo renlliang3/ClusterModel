@@ -102,10 +102,10 @@ def momentumpowerlaw_model(energy_gev, k0, index, E0=1.0):
     """
 
     P0 = E0
-    momentum = np.sqrt(energy_gev**2 - ((const.m_e *const.c**2)).to_value('GeV')**2) / const.c
+    momentum = np.sqrt(energy_gev**2 - ((const.m_e *const.c**2)).to_value('GeV')**2) / const.c.to_value('m/s')
 
     fP = k0 * (momentum/P0)**(-index)
-    dP =   ((energy_gev**2 - ((const.m_e *const.c**2).to_value('GeV'))**2)**(-1/2))/(2*const.c)*2*energy_gev
+    dP =   ((energy_gev**2 - ((const.m_e *const.c**2).to_value('GeV'))**2)**(-1/2))/(2*const.c.to_value('m/s'))*2*energy_gev
 
 # (1/(2*const.c)* (energy_gev**2 - ((const.m_e *const.c**2).to_value('GeV'))**2)**(-1/2)*2*energy_gev
 
