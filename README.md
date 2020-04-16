@@ -1,5 +1,5 @@
-# MICADO: Modeling the Intra Cluster Atmosphere for Diverse Observations
-Software dedicated to provide a model of the thermal and non-thermal gas in the clusters, multi-wavelenght modeling and observable predictions.
+# MINOS: Modeling of the ICM Non-thermal content and Observable prediction Software
+Software dedicated to provide a model of the thermal and non-thermal diffuse components in the clusters, multi-wavelenght modeling and observable predictions.
                                                             
 - model.py : 
 	main code that defines the class Cluster
