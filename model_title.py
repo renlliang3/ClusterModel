@@ -48,15 +48,25 @@ def show():
     #print("------------------------------------------------------------------")
     #print("                                                                  ")
 
-    print("================================================================")
-    print("                 __  __ ___ ___   _   ___   ___                 ")
-    print("                |  \/  |_ _/ __| /_\ |   \ / _ \                ")
-    print("                | |\/| || | (__ / _ \| |) | (_) |               ")
-    print("                |_|  |_|___\___/_/ \_\___/ \___/                ")   
-    print("================================================================")
-    print(" Modeling the Intra Cluster Atmosphere for Diverse Observations ")
-    print("----------------------------------------------------------------")
-    print("                                                                ")
+    #print("================================================================")
+    #print("                 __  __ ___ ___   _   ___   ___                 ")
+    #print("                |  \/  |_ _/ __| /_\ |   \ / _ \                ")
+    #print("                | |\/| || | (__ / _ \| |) | (_) |               ")
+    #print("                |_|  |_|___\___/_/ \_\___/ \___/                ")   
+    #print("================================================================")
+    #print(" Modeling the Intra Cluster Atmosphere for Diverse Observations ")
+    #print("----------------------------------------------------------------")
+    #print("                                                                ")
+
+    print("==========================================================================")
+    print("                        __  __ ___ _  _  ___  ___                         ")
+    print("                       |  \/  |_ _| \| |/ _ \/ __|                        ")
+    print("                       | |\/| || || .` | (_) \__ \                        ")
+    print("                       |_|  |_|___|_|\_|\___/|___/                        ")
+    print("==========================================================================")
+    print("Modeling of the ICM Non-thermal content and Observable prediction Software")
+    print("--------------------------------------------------------------------------")
+    print("                                                                          ")
 
     """
     Galaxy
@@ -74,6 +84,12 @@ def show():
     Gamma
     Ray
     Cosmic
+
+
+    MINOS - Modeling of the Icm Non-thermal content and Observable prediction Software
+
+
+
 
     Intra Cluster Medium Thermal and Nonthermal Modeling Multiwavelenght Observation
     ICMTNMMO
