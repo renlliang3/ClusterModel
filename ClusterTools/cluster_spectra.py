@@ -7,6 +7,7 @@ paper by Kelner et al. (2006).
 import numpy as np
 import scipy.integrate as integrate
 import scipy.interpolate as interpolate
+from astropy import units as u 
 from astropy import constants as const
 import matplotlib.pyplot as plt
 from ebltable.tau_from_model import OptDepth
@@ -59,11 +60,11 @@ def powerlaw_model(energy_gev, k0, index, E0=1.0):
 
 
 #===================================================
-#========== PowerLaw model
+#========== Exponential Cutoff PowerLaw model
 #===================================================
 def exponentialcutoffpowerlaw_model(energy_gev, k0, index, Ecut, E0=1.0):
     """
-    Compute a PowerLaw spectrum
+    Compute a PowerLaw spectrum with exponential
 
     Parameters
     ----------
@@ -80,6 +81,43 @@ def exponentialcutoffpowerlaw_model(energy_gev, k0, index, Ecut, E0=1.0):
     
     return k0 * (energy_gev/E0)**(-index) * np.exp(-energy_gev/Ecut)
 
+
+
+#===================================================
+#========== Momentum Space PowerLaw model
+#===================================================
+
+def momentumpowerlaw_model(energy_gev, k0, index, m = const.m_e, 
+                           Eemin = const.m_e*const.c**2, E0=1.0):
+    """
+    Compute a PowerLaw spectrum in momentum space
+
+    Parameters
+    ----------
+    - energy_GeV: scalar or vector
+    - k0 : normalization
+    - E0 : pivot energy (GeV)
+    - index : spectral index
+
+    Outputs
+    --------
+    - spectrum
+    """
+    
+
+    P0 = np.sqrt(E0**2 - ((m *const.c**2).to_value('GeV'))**2) / const.c.to_value('m/s')
+
+    
+    momentum = np.sqrt(energy_gev**2 - ((m *const.c**2).to_value('GeV'))**2) / const.c.to_value('m/s')
+
+    fP = k0 * (momentum/P0)**(-index)
+    dP = (energy_gev/const.c.to_value('m/s'))  / np.sqrt(energy_gev**2 - ((m *const.c**2).to_value('GeV'))**2)
+ 
+    
+    SE = fP*dP
+    SE[energy_gev < Eemin.to_value('GeV')] *= 0
+    
+    return SE
 
 #===================================================
 #========== Integral power law

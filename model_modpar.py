@@ -19,7 +19,7 @@ class Modpar(object):
     model parameters should be here.
 
     Profile models are now:  ['GNFW', 'SVM', 'beta', 'doublebeta']
-    Spectral models are now: ['PowerLaw', 'ExponentialCutoffPowerLaw']
+    Spectral models are now: ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw]
 
     Attributes
     ----------  
@@ -299,7 +299,7 @@ class Modpar(object):
         """
         
         # List of available authorized models
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
         
         # Deal with unit
         if unit == '' or unit == None:
@@ -353,7 +353,32 @@ class Modpar(object):
             outpar = {"name"        : 'ExponentialCutoffPowerLaw',
                       "Index"       : inpar['Index'],
                       "CutoffEnergy": inpar['CutoffEnergy'].to('TeV')}
-                    
+
+
+        #---------- Deal with the case of MomentumPowerLaw
+        if inpar['name'] == 'MomentumPowerLaw':
+            # Check the content of the dictionary
+            cond1 = 'Index' in inpar.keys() and 'Mass' in inpar.keys()
+            if not cond1:
+                raise ValueError("The MomentumPowerLawModel model should contain: {'Index', 'Mass'}.")
+  
+            # All good at this stage, setting parameters
+            outpar = {"name" : 'MomentumPowerLaw',
+                      "Index": inpar['Index'],
+                       "Mass": inpar['Mass']}
+
+            # Setting Optional Parameters
+            if 'Eemin' in inpar.keys():
+
+                # Check units
+                try:
+                    test = inpar['Eemin'].to('GeV')
+                except:
+                    raise TypeError("Eemin should be homogeneous to GeV")
+
+                # If units are good, set the parameter
+                outpar["Eemin"]= inpar['Eemin']
+                  
         return outpar
 
         
@@ -924,7 +949,7 @@ class Modpar(object):
 
         """
 
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
 
         if not model['name'] in model_list:
             print('The spectral model can :')
@@ -943,6 +968,16 @@ class Modpar(object):
             index   = model["Index"]
             Ecut   = model["CutoffEnergy"].to_value('GeV')
             S_E = cluster_spectra.exponentialcutoffpowerlaw_model(eng_GeV, 1.0, index, Ecut)
+
+        #----------
+        elif model['name'] == 'MomentumPowerLaw':
+            index  =model["Index"]
+            m  =model["Mass"]
+            if 'Eemin' in model.keys():
+                emin = model["Eemin"]
+                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m, emin)
+            else:
+                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m)
 
         #---------- Otherwise nothing is done
         else :

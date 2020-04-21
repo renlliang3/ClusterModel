@@ -212,8 +212,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 	# Cosmic ray primary electrons
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
                                      'PivotEnergy': 1.0*u.TeV,
-                                     'Index'      : 3.0}
-
+                                     'Index'      : 3.0}    
         #---------- Sampling
         self._Npt_per_decade_integ = 30
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
@@ -848,10 +847,10 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
         # Value check
         if value <= 0 :
-            raise ValueError("Energy Epmin should be larger than 0")
+            raise ValueError("Energy Eemin should be larger than 0")
         
         # Setting parameters
-        self._Epmin = value
+        self._Eemin = value
         
         # Information
         if not self._silent: print("Setting Eemin value")
@@ -869,7 +868,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
             raise ValueError("Energy Eemax should be larger than 0")
         
         # Setting parameters
-        self._Epmax = value
+        self._Eemax = value
         
         # Information
         if not self._silent: print("Setting Eemax value")
