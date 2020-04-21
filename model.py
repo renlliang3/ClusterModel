@@ -196,7 +196,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._density_gas_model  = 1
         self._density_crp_model  = 1
         self._density_cre1_model = 1
-	self._density_cre1_model = 1
         self._magfield_model     = 1
         # Set default model using UPP + isoThermal + isobaric
         self.set_pressure_gas_gNFW_param(pressure_model='P13UPP')
