@@ -358,13 +358,26 @@ class Modpar(object):
         #---------- Deal with the case of MomentumPowerLaw
         if inpar['name'] == 'MomentumPowerLaw':
             # Check the content of the dictionary
-            cond1 = 'Index' in inpar.keys() 
+            cond1 = 'Index' in inpar.keys() and 'Mass' in inpar.keys()
             if not cond1:
-                raise ValueError("The MomentumPowerLawModel model should contain: {'Index'}.")
+                raise ValueError("The MomentumPowerLawModel model should contain: {'Index', 'Mass'}.")
   
             # All good at this stage, setting parameters
             outpar = {"name" : 'MomentumPowerLaw',
-                      "Index": inpar['Index']}
+                      "Index": inpar['Index'],
+                       "Mass": inpar['Mass']}
+
+            # Setting Optional Parameters
+            if 'Eemin' in inpar.keys():
+
+                # Check units
+                try:
+                    test = inpar['Eemin'].to('GeV')
+                except:
+                    raise TypeError("Eemin should be homogeneous to GeV")
+
+                # If units are good, set the parameter
+                outpar["Eemin"]= inpar['Eemin']
                   
         return outpar
 
@@ -959,7 +972,12 @@ class Modpar(object):
         #----------
         elif model['name'] == 'MomentumPowerLaw':
             index  =model["Index"]
-            S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index)
+            m  =model["Mass"]
+            if 'Eemin' in model.keys():
+                emin = model["Eemin"]
+                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m, emin)
+            else:
+                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m)
 
         #---------- Otherwise nothing is done
         else :
