@@ -75,7 +75,7 @@ class Admin(object):
 
             
     #==================================================
-    # Print parameters
+    # Save parameters
     #==================================================
     
     def save_param(self):
@@ -109,7 +109,7 @@ class Admin(object):
 
                 
     #==================================================
-    # Print parameters
+    # Load parameters
     #==================================================
     
     def load_param(self, param_file):
