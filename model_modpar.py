@@ -554,7 +554,7 @@ class Modpar(object):
             Ppar['n_0'] = 1.0*u.adu
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._pressure_gas_model['name'] == 'beta':
             Ppar['n_0'] = 1.0*u.adu
@@ -602,7 +602,7 @@ class Modpar(object):
             Ppar['n_0'] = 1.0*u.adu
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._pressure_gas_model['name'] == 'beta':
             Ppar['n_0'] = 1.0*u.adu
@@ -651,7 +651,7 @@ class Modpar(object):
             Ppar['n_0'] = 1.0*u.adu
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._density_gas_model['name'] == 'beta':
             Ppar['n_0'] = 1.0*u.adu
@@ -700,7 +700,7 @@ class Modpar(object):
             Ppar['n_0'] = 1.0*u.adu
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._density_gas_model['name'] == 'beta':
             Ppar['n_0'] = 1.0*u.adu
@@ -753,7 +753,7 @@ class Modpar(object):
             Ppar['n_0'] = Bnorm
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._pressure_gas_model['name'] == 'beta':
             Ppar['n_0'] = Bnorm
@@ -804,7 +804,7 @@ class Modpar(object):
             Ppar['n_0'] = Bnorm
             Ppar['beta'] *= scal
             Ppar['alpha'] *= scal
-            Ppar['epsilion'] *= scal
+            Ppar['epsilon'] *= scal
             
         elif self._density_gas_model['name'] == 'beta':
             Ppar['n_0'] = Bnorm
