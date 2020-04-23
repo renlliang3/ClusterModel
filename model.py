@@ -190,6 +190,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Eemin = (const.m_e *const.c**2).to('GeV')
         self._Eemax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
+        self._coolcore = False 
 
         # Initialize the profile model (not useful but for clarity of variables)
         self._pressure_gas_model = 1
