@@ -23,6 +23,7 @@ from ClusterModel.ClusterTools import cluster_spectra
 from ClusterModel.ClusterTools import cluster_szspec
 from ClusterModel.ClusterTools import cluster_xspec
 from ClusterModel.ClusterTools import cluster_hadronic_emission_kafexhiu2014 as K14
+from ClusterModel.ClusterTools import cluster_hadronic_emission_kelner2006 as K06
 from ClusterModel.ClusterTools import cluster_electron_loss
 from ClusterModel.ClusterTools import cluster_electron_emission
     
@@ -1088,7 +1089,8 @@ class Physics(object):
     # Get the gamma ray production rate
     #==================================================
     
-    def get_rate_gamma(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_gamma(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc,
+                       model='Kafexhiu2014', limit='mixed'):
         """
         Compute the gamma ray production rate as dN/dEdVdt = f(E, r)
         
@@ -1096,6 +1098,8 @@ class Physics(object):
         ----------
         - energy (quantity) : the physical energy of gamma rays
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
+        - limit (str): in which limit to compute the result in the case of Kelner2006
 
         Outputs
         ----------
@@ -1116,18 +1120,31 @@ class Physics(object):
         # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
 
-        # Define the model
-        model = K14.PPmodel(Jp,
-                            Y0=self._helium_mass_fraction,
-                            Z0=self._metallicity_sol,
-                            abundance=self._abundance,
-                            hiEmodel=self._pp_interaction_model,
-                            Epmin=self._Epmin,
-                            Epmax=self._Epmax,
-                            NptEpPd=self._Npt_per_decade_integ)
-        
-        # Extract the spectrum
-        dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H).T
+        # Case of K14
+        if model == 'Kafexhiu2014':
+            model = K14.PPmodel(Jp,
+                                Y0=self._helium_mass_fraction,
+                                Z0=self._metallicity_sol,
+                                abundance=self._abundance,
+                                hiEmodel=self._pp_interaction_model,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+
+            dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H).T
+
+        # Case of K14
+        elif model == 'Kelner2006':
+            model = K06.PPmodel(Jp,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+            
+            dN_dEdVdt = model.gamma_spectrum(energy, radius, n_H, limit=limit).T
+
+        # Error
+        else:
+            raise ValueError('Only Kafexhiu2014 and Kelner2006 models are available.')
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
@@ -1136,22 +1153,25 @@ class Physics(object):
     # Get the secondary electron production rate
     #==================================================
     
-    def get_rate_cre2(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def get_rate_cre2(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc,
+                      model='Kafexhiu2014', limit='mixed'):
         """
         Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
         Note
-        ----------
+        ----
         At high energy, wit few point per decade, some "lines" may appear in the spectrum
         due to numerical issues.
 
         Parameters
         ----------
-        - energy (quantity) : the physical energy of gamma rays
+        - energy (quantity) : the physical energy of electrons
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
+        - limit (str): in which limit to compute the result in the case of Kelner2006
 
         Outputs
-        ----------
+        -------
         - dN_dEdVdt (np.ndarray): the differntial production rate
 
         """
@@ -1169,18 +1189,31 @@ class Physics(object):
         # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).value.T
 
-        # Define the model
-        model = K14.PPmodel(Jp,
-                            Y0=self._helium_mass_fraction,
-                            Z0=self._metallicity_sol,
-                            abundance=self._abundance,
-                            hiEmodel=self._pp_interaction_model,
-                            Epmin=self._Epmin,
-                            Epmax=self._Epmax,
-                            NptEpPd=self._Npt_per_decade_integ)
-        
-        # Extract the spectrum
-        dN_dEdVdt = model.electron_spectrum(energy, radius, n_H).T
+        # Case of K14
+        if model == 'Kafexhiu2014':
+            model = K14.PPmodel(Jp,
+                                Y0=self._helium_mass_fraction,
+                                Z0=self._metallicity_sol,
+                                abundance=self._abundance,
+                                hiEmodel=self._pp_interaction_model,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+
+            dN_dEdVdt = model.electron_spectrum(energy, radius, n_H).T
+
+        # Case of K14
+        elif model == 'Kelner2006':
+            model = K06.PPmodel(Jp,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+            
+            dN_dEdVdt = model.electron_spectrum(energy, radius, n_H, limit=limit).T
+
+        # Error
+        else:
+            raise ValueError('Only Kafexhiu2014 and Kelner2006 models are available.')
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
@@ -1189,23 +1222,26 @@ class Physics(object):
     # Get the neutrino production rate
     #==================================================
     
-    def get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc, flavor='all'):
+    def get_rate_neutrino(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc,
+                          model='Kafexhiu2014', limit='mixed', flavor='all'):
         """
         Compute the cosmic ray electron production rate as dN/dEdVdt = f(E, r)
         
         Note
-        ----------
+        ----
         At high energy, wit few point per decade, some "lines" may appear in the spectrum
         due to numerical issues.
 
         Parameters
         ----------
-        - energy (quantity) : the physical energy of gamma rays
+        - energy (quantity) : the physical energy of neutrinos
         - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
+        - limit (str): in which limit to compute the result in the case of Kelner2006
         - flavor (str): either 'all', 'numu' or 'nue'
 
         Outputs
-        ----------
+        -------
         - dN_dEdVdt (np.ndarray): the differntial production rate
 
         """
@@ -1223,30 +1259,58 @@ class Physics(object):
         # Parse the CRp distribution: returns call function[rad, energy] amd returns f[rad, energy]
         def Jp(rad, eng): return self.get_crp_2d(eng*u.GeV, rad*u.kpc).to_value('GeV-1 cm-3').T
 
-        # Define the model
-        model = K14.PPmodel(Jp,
-                            Y0=self._helium_mass_fraction,
-                            Z0=self._metallicity_sol,
-                            abundance=self._abundance,
-                            hiEmodel=self._pp_interaction_model,
-                            Epmin=self._Epmin,
-                            Epmax=self._Epmax,
-                            NptEpPd=self._Npt_per_decade_integ)
-    
-        # Extract the spectrum
-        if flavor == 'all':
-            dN_dEdVdt1 = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
-            dN_dEdVdt2 = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
-            dN_dEdVdt = dN_dEdVdt1 + dN_dEdVdt2
-            
-        elif flavor == 'numu':
-            dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
-            
-        elif flavor == 'nue':
-            dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
-            
-        else :
-            raise ValueError('Only all, numu and nue flavor are available.')    
+        # Case of K14
+        if model == 'Kafexhiu2014':
+            model = K14.PPmodel(Jp,
+                                Y0=self._helium_mass_fraction,
+                                Z0=self._metallicity_sol,
+                                abundance=self._abundance,
+                                hiEmodel=self._pp_interaction_model,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+
+            # Extract the spectrum
+            if flavor == 'all':
+                dN_dEdVdt1 = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
+                dN_dEdVdt2 = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
+                dN_dEdVdt = dN_dEdVdt1 + dN_dEdVdt2
+                
+            elif flavor == 'numu':
+                dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='numu').T
+                
+            elif flavor == 'nue':
+                dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, flavor='nue').T
+                
+            else :
+                raise ValueError('Only all, numu and nue flavor are available.')
+        
+        # Case of K14
+        elif model == 'Kelner2006':
+            model = K06.PPmodel(Jp,
+                                Epmin=self._Epmin,
+                                Epmax=self._Epmax,
+                                NptEpPd=self._Npt_per_decade_integ)
+
+            # Extract the spectrum
+            if flavor == 'all':
+                dN_dEdVdt1 = model.neutrino_spectrum(energy, radius, n_H, limit=limit, flavor='numu').T
+                dN_dEdVdt2 = model.neutrino_spectrum(energy, radius, n_H, limit=limit, flavor='nue').T
+                dN_dEdVdt = dN_dEdVdt1 + dN_dEdVdt2
+                
+            elif flavor == 'numu':
+                dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, limit=limit, flavor='numu').T
+                
+            elif flavor == 'nue':
+                dN_dEdVdt = model.neutrino_spectrum(energy, radius, n_H, limit=limit, flavor='nue').T
+                
+            else :
+                raise ValueError('Only all, numu and nue flavor are available.')
+
+        # Error
+        else:
+            raise ValueError('Only Kafexhiu2014 and Kelner2006 models are available.')
+
 
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
@@ -1267,7 +1331,7 @@ class Physics(object):
         - energy (quantity) : the physical energy of electrons
 
         Outputs
-        ----------
+        -------
         - dNg_dEdV (np.ndarray): the differntial production rate
 
         """
