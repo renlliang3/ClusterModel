@@ -1623,7 +1623,8 @@ class Physics(object):
             raise ValueError("nH or file_HI should be provided to get the hydrogen column density.")
         
         # Compute the table
-        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table.txt', nH2use, self._abundance, self._redshift,
+        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table.txt', nH2use,
+                                       self._abundance, self._redshift,
                                        Emin.to_value('keV'), Emax.to_value('keV'), 
                                        Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
                                        file_ana=self._output_dir+'/xspec_analysis.txt',
@@ -1634,7 +1635,8 @@ class Physics(object):
                                        logspace=True)
 
         # Compute the table in the case of the cluster frame
-        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table_ClusterFrame.txt', nH2use, self._abundance, 0.0,
+        cluster_xspec.make_xspec_table(self._output_dir+'/XSPEC_table_ClusterFrame.txt', nH2use,
+                                       self._abundance, 0.0,
                                        Emin.to_value('keV'), Emax.to_value('keV'), 
                                        Tmin=Tmin.to_value('keV'), Tmax=Tmax.to_value('keV'), nbin=nbin,
                                        file_ana=self._output_dir+'/xspec_analysis.txt',

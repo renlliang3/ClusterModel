@@ -177,16 +177,16 @@ class ClusterElectronEmission(object):
         """
 
         #---------- Extract quantities to be used, normalized by electron rest mass
-        Ecmb = (const.k_B*cosmo.Tcmb0*(1+redshift) / (const.m_e*const.c**2)).to_value('')       # kB T / m_e c^2
+        Ecmb = (const.k_B*cosmo.Tcmb0*(1+redshift) / (const.m_e*const.c**2)).to_value('')       # kB T/m_e c^2
 
-        Egamma = (Egamma_input / (const.m_e*const.c**2)).to_value('')                           # E_photon / m_e c^2
+        Egamma = (Egamma_input / (const.m_e*const.c**2)).to_value('')                           # E_photon/m_e c^2
         if type(Egamma) == float: Egamma = np.array([Egamma])
         Egamma = np.vstack(Egamma)
-        Eelec = (self.Ee/(const.m_e*const.c**2).to_value('GeV'))                                # E_electron / m_e c^2
+        Eelec = (self.Ee/(const.m_e*const.c**2).to_value('GeV'))                                # E_elec/m_e c^2
 
         #---------- Conput the normalizing constant
         r0 = (const.e.value*const.e.unit)**2 / (const.m_e*const.c**2) / (4*np.pi*const.eps0)
-        C0 = 2 * r0**2 * const.m_e**3 * const.c**4 / (np.pi * const.hbar**3)                    # This should be s-1
+        C0 = 2 * r0**2 * const.m_e**3 * const.c**4 / (np.pi * const.hbar**3)                    # Should be s-1
         
         #---------- Compute equation the cross section from Eq 14
         par3 = [0.606, 0.443, 1.481, 0.540, 0.319] # Parameters from Eqs 26, 27
