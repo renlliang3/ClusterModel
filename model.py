@@ -213,7 +213,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
                                      'PivotEnergy': 1.0*u.TeV,
                                      'Index'      : 3.0}
-        self._apply_cre1_loss = False
+        self._cre1_losses = None
         
         #---------- Sampling
         self._Npt_per_decade_integ = 30
