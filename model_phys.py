@@ -515,18 +515,6 @@ class Physics(object):
         
         return radius, B_r.to('uG')
 
-
-
-
-
-
-
-
-
-
-
-
-
     
     #==================================================
     # Get normalized CR 2D spectrum X profile
@@ -585,7 +573,13 @@ class Physics(object):
 
         # In case the input is not an array
         energy = model_tools.check_qarray(energy, unit='GeV')
-        radius = model_tools.check_qarray(radius, unit='kpc')   
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # In case losses are applied, energy range should extend
+        if self._cre1_loss_model is not 'None':
+            print('ToDo')
+        else:
+            print('Done')
         
         # get profile
         f_r = self._get_generic_profile(radius, self._density_cre1_model)
@@ -601,8 +595,65 @@ class Physics(object):
         # compute the distrib
         distribution = f_E2 * f_r2
 
+        # Apply losses to the distribution
+        if self._cre1_loss_model is not 'None':
+            if self._cre1_loss_model == 'Steady':
+                distribution = self.apply_steady_state_electron_loss(energy, radius, distribution)
+        
         return distribution * u.adu
+    
 
+    #==================================================
+    # Apply steady state losses to a given injection rate
+    #==================================================
+    
+    def apply_steady_state_electron_loss(self, energy, radius, dN_dEdVdt):
+        """
+        Compute the cosmic ray proton 2d distribution, but normalized.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR protons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - distribution (quantity): in adu, with distribution[i_energy, i_radius]
+
+        """
+        
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Get the necessary quantity
+        radius, n_e = self.get_density_gas_profile(radius)
+        radius, B   = self.get_magfield_profile(radius)
+        
+        # Get the losses
+        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
+
+
+        for i in range(len(energy)):
+            # Set out of limit values to 0
+            dN_dEdVdt_i = dN_dEdVdt.copy()
+            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
+            
+            # Compute integral
+            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
+
+        # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
+        energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
+        w_neg = energy_grid <= const.m_e*const.c**2 # flag energies that are not possible
+        dEdt[w_neg] = 1*dEdt.unit
+        dN_dEdV = dN_dEdVdt_integrated / dEdt
+        dN_dEdV[w_neg] = 0
+
+        return dN_dEdV
+
+
+
+    
 
     #==================================================
     # Get the CR proton normalization
@@ -1338,7 +1389,7 @@ class Physics(object):
         # Compute the losses
         dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
 
-        # Get the injection rate between the and max possible, i.e. Epmax
+        # Get the injection rate between the min and max possible, i.e. Epmax
         emin = np.amax([(const.m_e*const.c**2).to_value('GeV'),
                         np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
         emax = self._Epmax
