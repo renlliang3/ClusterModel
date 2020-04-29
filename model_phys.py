@@ -624,6 +624,22 @@ class Physics(object):
         return energy, S_E*u.adu
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
     #==================================================
     # Get the CR proton normalization
     #==================================================
@@ -778,73 +794,30 @@ class Physics(object):
         eng, f_E = self.get_normed_cre1_spectrum(energy)
         f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T = True )
     
-        spectrum= norm * f_E2 * f_r2
+        spectrum = norm * f_E2 * f_r2
      
         return spectrum.to('GeV-1 cm-3')
 
-    #==================================================
-    # Get the CR primary electron 2d distribution in Steady State
-    #==================================================
-
-    def get_cre1_2d_SS(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
-        """
-        Compute the cosmic ray primary electron 2d distribution for clusters in steady state.
-        
-        Parameters
-        ----------
-        - energy (quantity) : the physical energy of CR protons
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
-
-        """
-
-
-        # In case the input is not an array
-        energy = model_tools.check_qarray(energy, unit='GeV')
-        radius = model_tools.check_qarray(radius, unit='kpc')
-
-        # Get the necessary quantity
-        radius, n_e = self.get_density_gas_profile(radius)
-        radius, B   = self.get_magfield_profile(radius)
-
-        # Compute the losses
-        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
-
-        # Get the injection rate between the and max possible, i.e. Epmax
-        emin = np.amax([(const.m_e*const.c**2).to_value('GeV'),
-                        np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
-        emax = self._Epmax
-        eng = model_tools.sampling_array(emin, emax, NptPd=self._Npt_per_decade_integ, unit=True)
-        # Take the basic 2d spectrum for CRe1 
-        dN_dEdVdt = self.get_cre1_2d(eng, radius)*u.s**-1           ### get spectrum using momentum powerlaw by modifying model externally 
-        eng_grid = model_tools.replicate_array(eng, len(radius), T=True)
-
-        # Integrated cumulatively over the energy
-        dN_dEdVdt_integrated = np.zeros((len(energy),len(radius))) * u.cm**-3*u.s**-1
-        
-        for i in range(len(energy)):
-            # Set out of limit values to 0
-            dN_dEdVdt_i = dN_dEdVdt.copy()
-            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
-            
-            # Compute integral
-            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
-
-        # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
-        energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
-        w_neg = energy_grid <= const.m_e*const.c**2 # flag energies that are not possible
-        dEdt[w_neg] = 1*dEdt.unit
-        dN_dEdV = dN_dEdVdt_integrated / dEdt
-        dN_dEdV[w_neg] = 0
-        
-        return dN_dEdV.to('GeV-1 cm-3 ')
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     #==================================================
     # Get the CR proton density profile
     #==================================================
@@ -888,8 +861,8 @@ class Physics(object):
             profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis=0)).to('cm-3')
             
         return radius, profile
-
-
+    
+    
     #==================================================
     # Get the CR primary electron density profile
     #==================================================
@@ -1021,12 +994,8 @@ class Physics(object):
             rad.sort()
 
         # Get the differential spectrum/profile
-        #dN_dEdV = self.get_cre1_2d(energy, rad)
-        if self._coolcore:
-            dN_dEdV = self.get_cre1_2d_SS(energy, rad)
-        else:
-            dN_dEdV = self.get_cre1_2d(energy, rad)
-        
+        dN_dEdV = self.get_cre1_2d(energy, rad)
+  
         # Integrate
         spectrum = model_tools.trapz_loglog(4*np.pi*rad**2 * dN_dEdV, rad)
 
@@ -1085,6 +1054,110 @@ class Physics(object):
         return radius, x_r*u.adu
 
 
+    #==================================================
+    # Get the CRe1 to thermal energy profile
+    #==================================================
+    
+    def get_cre1_to_thermal_energy_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                           Emin=None, Emax=None):
+        """
+        Compute the X_cre1_E profile, i.e. the primary cosmic ray electron to thermal 
+        energy enclosed within R profile.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - Emin (quantity): the lower bound for energy integration
+        - Emax (quantity): the upper bound for energy integration
+
+        Outputs
+        ----------
+        - x_r (np.ndarray): the profile
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Define energy (going below/above Eemin/Eemax only introduces more integration error because of discountinuity)
+        if Emin is None or Emin < self._Eemin:
+            Emin = self._Eemin
+        if Emax is None or Emax > self._Eemax:
+            Emax = self._Eemax
+        
+        # Thermal energy
+        r_uth, Uth_r = self.get_thermal_energy_profile(radius)
+
+        # Integrate CR energy density profile
+        Ucr_r = np.zeros(len(radius))*u.GeV
+        for i in range(len(radius)):
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            # To avoid ringing at Rtrunc, insert it if we are above
+            if np.amax(rad) > self._R_truncation:
+                rad = rad.insert(0, self._R_truncation)
+                rad.sort()
+            rad, e_cr = self.get_density_cre1_profile(rad, Emin=Emin, Emax=Emax, Energy_density=True)
+            Ucr_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2 * e_cr, rad)
+
+        # X(<R)
+        x_r = Ucr_r.to_value('GeV') / Uth_r.to_value('GeV')
+
+        return radius, x_r*u.adu
+
+    
+    #==================================================
+    # Get the CRe1 to thermal energy profile
+    #==================================================
+    
+    def get_cre2_to_thermal_energy_profile(self, radius=np.logspace(0,4,100)*u.kpc,
+                                           Emin=None, Emax=None):
+        """
+        Compute the X_cre2_E profile, i.e. the secondary cosmic ray electron to thermal 
+        energy enclosed within R profile.
+        
+        Parameters
+        ----------
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - Emin (quantity): the lower bound for energy integration
+        - Emax (quantity): the upper bound for energy integration
+
+        Outputs
+        ----------
+        - x_r (np.ndarray): the profile
+
+        """
+
+        # In case the input is not an array
+        radius = model_tools.check_qarray(radius, unit='kpc')
+
+        # Define energy
+        if Emin is None:
+            Emin = (const.m_e*const.c**2).to('GeV')
+        if Emax is None:
+            Emax = self._Epmax
+            
+        # Thermal energy
+        r_uth, Uth_r = self.get_thermal_energy_profile(radius)
+
+        # Integrate CR energy density profile
+        Ucr_r = np.zeros(len(radius))*u.GeV
+        for i in range(len(radius)):
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
+            # To avoid ringing at Rtrunc, insert it if we are above
+            if np.amax(rad) > self._R_truncation:
+                rad = rad.insert(0, self._R_truncation)
+                rad.sort()
+            rad, e_cr = self.get_density_cre2_profile(rad, Emin=Emin, Emax=Emax, Energy_density=True)
+            Ucr_r[i] = model_tools.trapz_loglog(4*np.pi*rad**2 * e_cr, rad)
+
+        # X(<R)
+        x_r = Ucr_r.to_value('GeV') / Uth_r.to_value('GeV')
+
+        return radius, x_r*u.adu
+    
+    
     #==================================================
     # Get the gamma ray production rate
     #==================================================
