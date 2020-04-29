@@ -516,115 +516,6 @@ class Physics(object):
         return radius, B_r.to('uG')
 
 
-    #==================================================
-    # Get normalized CR density profile
-    #==================================================
-    
-    def get_normed_density_crp_profile(self, radius=np.logspace(0,4,100)*u.kpc):
-        """
-        Get the normalized cosmic ray proton density profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - n_r (quantity): the normalized density profile, unitless
-
-        """
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius, unit='kpc')
-        
-        # get profile
-        n_r = self._get_generic_profile(radius, self._density_crp_model)
-        n_r[radius > self._R_truncation] *= 0
-        
-        return radius, n_r.to('adu')
-
-
-    def get_normed_density_cre1_profile(self, radius=np.logspace(0,4,100)*u.kpc):
-        """
-        Get the normalized cosmic ray primary electron density profile.
-        
-        Parameters
-        ----------
-        - radius (quantity) : the physical 3d radius in units homogeneous to kpc, as a 1d array
-
-        Outputs
-        ----------
-        - radius (quantity): the 3d radius in unit of kpc
-        - n_r (quantity): the normalized density profile, unitless
-
-        """    
-
-        # In case the input is not an array
-        radius = model_tools.check_qarray(radius, unit='kpc')
-
-        # get profile
-        n_r = self._get_generic_profile(radius, self._density_cre1_model)
-        n_r[radius > self._R_truncation] *= 0 
-    
-        return radius, n_r.to('adu')
-
- 
-    #==================================================
-    # Get normalized CR spectrum
-    #==================================================
-    
-    def get_normed_crp_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV):
-        """
-        Get the normalized cosmic ray proton spectrum.
-        
-        Parameters
-        ----------
-        - energy (quantity) : the physical energy of CR protons
-
-        Outputs
-        ----------
-        - energy (quantity): the energy in unit homogeneous to GeV
-        - S_E (quantity): the normalized spectrum profile, unitless
-
-        """
-
-        # In case the input is not an array
-        energy = model_tools.check_qarray(energy, unit='GeV')
-
-        # get spectrum
-        S_E = self._get_generic_spectrum(energy, self._spectrum_crp_model)
-        S_E[energy > self._Epmax] *= 0
-        S_E[energy < self._Epmin] *= 0
-        
-        return energy, S_E*u.adu
-
-
-    def get_normed_cre1_spectrum(self, energy=np.logspace(-2,7,100)*u.GeV): 
-        """
-        Get the normalized cosmic ray primary electron spectrum.
-        
-        Parameters
-        ----------
-        - energy (quantity) : the physical energy of CR protons
-
-        Outputs
-        ----------
-        - energy (quantity): the energy in unit homogeneous to GeV
-        - S_E (quantity): the normalized spectrum profile, unitless
-
-        """
-
-        energy = model_tools.check_qarray(energy, unit='GeV')
-    
-        S_E = self._get_generic_spectrum(energy, self._spectrum_cre1_model)
-        S_E[energy > self._Eemax] *= 0
-        S_E[energy < self._Eemin] *= 0
-    
-        return energy, S_E*u.adu
-
-
-
 
 
 
@@ -641,7 +532,7 @@ class Physics(object):
     # Get normalized CR 2D spectrum X profile
     #==================================================
     
-    def get_normed_crp_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def _get_normed_crp_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the cosmic ray proton 2d distribution, but normalized.
         
@@ -660,13 +551,16 @@ class Physics(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')
         
-        # Replicate over the energy
-        rad, f_r = self.get_normed_density_crp_profile(radius)
+        # get profile
+        f_r = self._get_generic_profile(radius, self._density_crp_model)
+        f_r[radius > self._R_truncation] *= 0
         f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
 
-        # Replicate over the radius
-        eng, f_E = self.get_normed_crp_spectrum(energy)
-        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
+        # get spectrum
+        f_E = self._get_generic_spectrum(energy, self._spectrum_crp_model)
+        f_E[energy > self._Epmax] *= 0
+        f_E[energy < self._Epmin] *= 0
+        f_E2 = model_tools.replicate_array(f_E, len(radius), T=True)
 
         # compute the distrib
         distribution = f_E2 * f_r2
@@ -674,7 +568,7 @@ class Physics(object):
         return distribution * u.adu
 
     
-    def get_normed_cre1_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+    def _get_normed_cre1_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the cosmic ray primary electron 2d distribution, but normalized.
         
@@ -693,13 +587,16 @@ class Physics(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')   
         
-        # Integrate over the considered volume
-        rad, f_r = self.get_normed_density_cre1_profile(radius)
+        # get profile
+        f_r = self._get_generic_profile(radius, self._density_cre1_model)
+        f_r[radius > self._R_truncation] *= 0 
         f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
         
-        # energy
-        eng, f_E = self.get_normed_cre1_spectrum(energy)
-        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
+        # get spectrum
+        f_E = self._get_generic_spectrum(energy, self._spectrum_cre1_model)
+        f_E[energy > self._Eemax] *= 0
+        f_E[energy < self._Eemin] *= 0
+        f_E2 = model_tools.replicate_array(f_E, len(radius), T=True)
     
         # compute the distrib
         distribution = f_E2 * f_r2
@@ -735,7 +632,7 @@ class Physics(object):
         # Get the 2d distribution
         rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
         eng = model_tools.sampling_array(self._Epmin, self._Epmax, NptPd=self._Npt_per_decade_integ, unit=True)
-        f_cr_e_r = self.get_normed_crp_2d(eng, rad)
+        f_cr_e_r = self._get_normed_crp_2d(eng, rad)
 
         # Integrate over radius then energy
         rad2d = model_tools.replicate_array(rad, len(eng), T=False)
@@ -776,7 +673,7 @@ class Physics(object):
         # Get the 2d distribution
         rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
         eng = model_tools.sampling_array(self._Eemin, self._Eemax, NptPd=self._Npt_per_decade_integ, unit=True)
-        f_cr_e_r = self.get_normed_cre1_2d(eng, rad)
+        f_cr_e_r = self._get_normed_cre1_2d(eng, rad)
 
         # Integrate over radius then energy
         rad2d = model_tools.replicate_array(rad, len(eng), T=False)
@@ -787,22 +684,8 @@ class Physics(object):
         Norm = self._X_cre1_E['X'] * U_th / Icr
 
         return Norm.to('GeV-1 cm-3')
-
- 
-
-
-
-
-
-
-
-
-
-
     
-
-
-
+    
     #==================================================
     # Get the CR proton 2d distribution
     #==================================================
@@ -823,7 +706,7 @@ class Physics(object):
         """
         
         norm = self._get_crp_normalization()
-        distribution = norm * self.get_normed_crp_2d(energy, radius).to_value('adu')
+        distribution = norm * self._get_normed_crp_2d(energy, radius).to_value('adu')
 
         return distribution.to('GeV-1 cm-3')
 
@@ -848,24 +731,10 @@ class Physics(object):
         """
 
         norm = self._get_cre1_normalization()
-        distribution = norm * self.get_normed_cre1_2d(energy, radius).to_value('adu')
+        distribution = norm * self._get_normed_cre1_2d(energy, radius).to_value('adu')
      
         return distribution.to('GeV-1 cm-3')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
     
     #==================================================
     # Get the CR proton density profile
