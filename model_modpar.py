@@ -299,7 +299,8 @@ class Modpar(object):
         """
         
         # List of available authorized models
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw',
+                      'InitialInjection', 'ContinuousInjection']
         
         # Deal with unit
         if unit == '' or unit == None:
@@ -347,13 +348,12 @@ class Modpar(object):
             
             # Check values
             if inpar['CutoffEnergy'] < 0:
-                raise ValueError("CutoffEnergy should be <= 0")   
+                raise ValueError("CutoffEnergy should be >= 0")   
             
             # All good at this stage, setting parameters
             outpar = {"name"        : 'ExponentialCutoffPowerLaw',
                       "Index"       : inpar['Index'],
                       "CutoffEnergy": inpar['CutoffEnergy'].to('TeV')}
-
 
         #---------- Deal with the case of MomentumPowerLaw
         if inpar['name'] == 'MomentumPowerLaw':
@@ -361,24 +361,62 @@ class Modpar(object):
             cond1 = 'Index' in inpar.keys() and 'Mass' in inpar.keys()
             if not cond1:
                 raise ValueError("The MomentumPowerLawModel model should contain: {'Index', 'Mass'}.")
-  
+
+            # The mass should be given in units homogeneous to GeV
+            try:
+                test = inpar['Mass'].to('GeV')
+            except:
+                raise TypeError("Mass should be homogeneous to GeV")
+                            
             # All good at this stage, setting parameters
             outpar = {"name" : 'MomentumPowerLaw',
                       "Index": inpar['Index'],
                        "Mass": inpar['Mass']}
 
-            # Setting Optional Parameters
-            if 'Eemin' in inpar.keys():
+        #---------- Deal with the case of InitialInjection
+        if inpar['name'] == 'InitialInjection':
+            # Check the content of the dictionary
+            cond1 = 'Index' in inpar.keys() and 'BreakEnergy' in inpar.keys()
+            if not cond1:
+                raise ValueError("The InitialInjection model should contain: {'Index', 'BreakEnergy'}.")
 
-                # Check units
-                try:
-                    test = inpar['Eemin'].to('GeV')
-                except:
-                    raise TypeError("Eemin should be homogeneous to GeV")
+            # Check units
+            try:
+                test = inpar['BreakEnergy'].to('TeV')
+            except:
+                raise TypeError("BreakEnergy should be homogeneous to TeV")
+            
+            # Check values
+            if inpar['BreakEnergy'] < 0:
+                raise ValueError("BreakEnergy should be >= 0")   
+            
+            # All good at this stage, setting parameters
+            outpar = {"name"       : 'InitialInjection',
+                      "Index"      : inpar['Index'],
+                      "BreakEnergy": inpar['BreakEnergy'].to('TeV')}
 
-                # If units are good, set the parameter
-                outpar["Eemin"]= inpar['Eemin']
-                  
+        #---------- Deal with the case of InitialInjection
+        if inpar['name'] == 'ContinuousInjection':
+            # Check the content of the dictionary
+            cond1 = 'Index' in inpar.keys() and 'BreakEnergy' in inpar.keys()
+            if not cond1:
+                raise ValueError("The ContinuousInjection model should contain: {'Index', 'BreakEnergy'}.")
+
+            # Check units
+            try:
+                test = inpar['BreakEnergy'].to('TeV')
+            except:
+                raise TypeError("BreakEnergy should be homogeneous to TeV")
+            
+            # Check values
+            if inpar['BreakEnergy'] < 0:
+                raise ValueError("BreakEnergy should be >= 0")   
+            
+            # All good at this stage, setting parameters
+            outpar = {"name"       : 'ContinuousInjection',
+                      "Index"      : inpar['Index'],
+                      "BreakEnergy": inpar['BreakEnergy'].to('TeV')}
+            
         return outpar
 
         
@@ -949,7 +987,8 @@ class Modpar(object):
 
         """
 
-        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw']
+        model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw',
+                      'InitialInjection', 'ContinuousInjection']
 
         if not model['name'] in model_list:
             print('The spectral model can :')
@@ -958,29 +997,38 @@ class Modpar(object):
 
         eng_GeV = energy.to_value('GeV')
 
-        #---------- Case of GNFW profile
+        #---------- Case of PowerLaw model
         if model['name'] == 'PowerLaw':
             index   = model["Index"]
             S_E = cluster_spectra.powerlaw_model(eng_GeV, 1.0, index)
 
-        #---------- Case of SVM model
+        #---------- Case of ExponentialCutoffPowerLaw model
         elif model['name'] == 'ExponentialCutoffPowerLaw':
             index   = model["Index"]
             Ecut   = model["CutoffEnergy"].to_value('GeV')
             S_E = cluster_spectra.exponentialcutoffpowerlaw_model(eng_GeV, 1.0, index, Ecut)
 
-        #----------
+        #---------- Case of MomentumPowerLaw model
         elif model['name'] == 'MomentumPowerLaw':
-            index  =model["Index"]
-            m  =model["Mass"]
-            if 'Eemin' in model.keys():
-                emin = model["Eemin"]
-                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m, emin)
-            else:
-                S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, m)
+            index  = model["Index"]
+            mass  = model["Mass"]
+            S_E = cluster_spectra.momentumpowerlaw_model(eng_GeV, 1.0, index, mass=mass)
 
+        #---------- Case of InitialInjection model
+        elif model['name'] == 'InitialInjection':
+            index  = model["Index"]
+            Ebreak  = model["BreakEnergy"].to_value('GeV')
+            S_E = cluster_spectra.initial_injection_model(eng_GeV, 1.0, index, Ebreak)
+            
+        #---------- Case of InitialInjection model
+        elif model['name'] == 'ContinuousInjection':
+            index  = model["Index"]
+            Ebreak  = model["BreakEnergy"].to_value('GeV')
+            S_E = cluster_spectra.continuous_injection_model(eng_GeV, 1.0, index, Ebreak)
+            
         #---------- Otherwise nothing is done
         else :
             if not self._silent: print('The requested model has not been implemented.')
 
         return S_E
+
