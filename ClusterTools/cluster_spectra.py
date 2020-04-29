@@ -82,13 +82,13 @@ def exponentialcutoffpowerlaw_model(energy_gev, k0, index, Ecut, E0=1.0):
     return k0 * (energy_gev/E0)**(-index) * np.exp(-energy_gev/Ecut)
 
 
-
 #===================================================
 #========== Momentum Space PowerLaw model
 #===================================================
 
-def momentumpowerlaw_model(energy_gev, k0, index, m = const.m_e, 
-                           Eemin = const.m_e*const.c**2, E0=1.0):
+def momentumpowerlaw_model(energy_gev, k0, index,
+                           E0=1.0,
+                           mass=const.m_e*const.c**2):
     """
     Compute a PowerLaw spectrum in momentum space
 
@@ -96,28 +96,146 @@ def momentumpowerlaw_model(energy_gev, k0, index, m = const.m_e,
     ----------
     - energy_GeV: scalar or vector
     - k0 : normalization
-    - E0 : pivot energy (GeV)
     - index : spectral index
+    - E0 : pivot energy (GeV)
+    - mass (qauntity): the  mass of the considered particle
 
     Outputs
     --------
     - spectrum
     """
     
-
-    P0 = np.sqrt(E0**2 - ((m *const.c**2).to_value('GeV'))**2) / const.c.to_value('m/s')
-
+    P0 = np.sqrt(E0**2 - (mass.to_value('GeV'))**2) / const.c.to_value('m/s')
     
-    momentum = np.sqrt(energy_gev**2 - ((m *const.c**2).to_value('GeV'))**2) / const.c.to_value('m/s')
+    momentum = np.sqrt(energy_gev**2 - (mass.to_value('GeV'))**2) / const.c.to_value('m/s')
 
     fP = k0 * (momentum/P0)**(-index)
-    dP = (energy_gev/const.c.to_value('m/s'))  / np.sqrt(energy_gev**2 - ((m *const.c**2).to_value('GeV'))**2)
- 
-    
+    dP = (energy_gev/const.c.to_value('m/s'))  / np.sqrt(energy_gev**2 - (mass.to_value('GeV'))**2)
+     
     SE = fP*dP
-    SE[energy_gev < Eemin.to_value('GeV')] *= 0
     
     return SE
+
+
+#===================================================
+#========== Initial injection (Jaffe Perola) model
+#===================================================
+
+def initial_injection_model(energy_gev, k0, index, Ebreak,
+                            E0=1.0):
+    """
+    Compute a JP spectrum. See Jaffe and Perola (1973),
+    and Turner 2017 (+Pacholczyk 1970; Longair 2010)
+
+    Parameters
+    ----------
+    - energy_GeV: scalar or vector
+    - k0 : normalization
+    - index : spectral index
+    - E0 : pivot energy (GeV)
+    - Ebreak : break energy (GeV)
+
+    Outputs
+    --------
+    - spectrum
+    """
+
+    S = k0 * (energy_gev/E0)**(-index) * (1-energy_gev/Ebreak)**(index-2)
+    S[energy_gev > Ebreak] = 0
+    
+    return S
+
+
+#===================================================
+#========== Continuous Injection model
+#===================================================
+
+def continuous_injection_model(energy_gev, k0, index, Ebreak,
+                               E0=1.0):
+    """
+    Compute a CI spectrum. See Pacholczyk 1970,
+    and Turner 2017
+
+    Parameters
+    ----------
+    - energy_GeV: scalar or vector
+    - k0 : normalization
+    - index : spectral index
+    - E0 : pivot energy (GeV)
+    - Ebreak : break energy (GeV)
+
+    Outputs
+    --------
+    - spectrum
+    """
+
+    f1 = k0 * (energy_gev/E0)**(-index-1)
+    f2 = 1 - (1-energy_gev/Ebreak)**(index-1)
+    S = energy_gev*0
+    S[energy_gev >= Ebreak] = f1[energy_gev >= Ebreak]
+    S[energy_gev < Ebreak] = (f1*f2)[energy_gev < Ebreak]
+    
+    return S
+
+#    #==================================================
+#    # Apply losses to Steady State to rate
+#    #==================================================
+#
+#    def _apply_steady_state_electron_loss(self):
+#        """
+#        Apply losses in the steady state assumption to an electron rate
+#        
+#        Parameters
+#        ----------
+#        - energy (quantity) : the physical energy of CR protons
+#        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+#
+#        Outputs
+#        ----------
+#        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
+#
+#        """
+#
+#        # In case the input is not an array
+#        energy = model_tools.check_qarray(energy, unit='GeV')
+#        radius = model_tools.check_qarray(radius, unit='kpc')
+#
+#        # Get the necessary quantity
+#        radius, n_e = self.get_density_gas_profile(radius)
+#        radius, B   = self.get_magfield_profile(radius)
+#
+#        # Compute the losses
+#        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
+#
+#        # Get the injection rate between the and max possible, i.e. Epmax
+#        emin = np.amax([(const.m_e*const.c**2).to_value('GeV'),
+#                        np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
+#        emax = self._Epmax
+#        eng = model_tools.sampling_array(emin, emax, NptPd=self._Npt_per_decade_integ, unit=True)
+#        # Take the basic 2d spectrum for CRe1 
+#        dN_dEdVdt = self.get_cre1_2d(eng, radius)*u.s**-1           ### get spectrum using momentum powerlaw by modifying model externally 
+#        eng_grid = model_tools.replicate_array(eng, len(radius), T=True)
+#
+#        # Integrated cumulatively over the energy
+#        dN_dEdVdt_integrated = np.zeros((len(energy),len(radius))) * u.cm**-3*u.s**-1
+#        
+#        for i in range(len(energy)):
+#            # Set out of limit values to 0
+#            dN_dEdVdt_i = dN_dEdVdt.copy()
+#            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
+#            
+#            # Compute integral
+#            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
+#
+#        # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
+#        energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
+#        w_neg = energy_grid <= const.m_e*const.c**2 # flag energies that are not possible
+#        dEdt[w_neg] = 1*dEdt.unit
+#        dN_dEdV = dN_dEdVdt_integrated / dEdt
+#        dN_dEdV[w_neg] = 0
+#        
+#        return dN_dEdV.to('GeV-1 cm-3 ')
+
 
 #===================================================
 #========== Integral power law
