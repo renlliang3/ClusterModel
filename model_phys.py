@@ -515,7 +515,7 @@ class Physics(object):
         
         return radius, B_r.to('uG')
 
-    
+
     #==================================================
     # Get normalized CR density profile
     #==================================================
@@ -584,7 +584,7 @@ class Physics(object):
 
         Outputs
         ----------
-        - radius (quantity): the 3d radius in unit of kpc
+        - energy (quantity): the energy in unit homogeneous to GeV
         - S_E (quantity): the normalized spectrum profile, unitless
 
         """
@@ -610,7 +610,7 @@ class Physics(object):
 
         Outputs
         ----------
-        - radius (quantity): the 3d radius in unit of kpc
+        - energy (quantity): the energy in unit homogeneous to GeV
         - S_E (quantity): the normalized spectrum profile, unitless
 
         """
@@ -636,9 +636,76 @@ class Physics(object):
 
 
 
+    
+    #==================================================
+    # Get normalized CR 2D spectrum X profile
+    #==================================================
+    
+    def get_normed_crp_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+        """
+        Compute the cosmic ray proton 2d distribution, but normalized.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR protons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
 
+        Outputs
+        ----------
+        - distribution (quantity): in adu, with distribution[i_energy, i_radius]
+
+        """
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')
+        
+        # Replicate over the energy
+        rad, f_r = self.get_normed_density_crp_profile(radius)
+        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
+
+        # Replicate over the radius
+        eng, f_E = self.get_normed_crp_spectrum(energy)
+        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
+
+        # compute the distrib
+        distribution = f_E2 * f_r2
+
+        return distribution * u.adu
 
     
+    def get_normed_cre1_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
+        """
+        Compute the cosmic ray primary electron 2d distribution, but normalized.
+        
+        Parameters
+        ----------
+        - energy (quantity) : the physical energy of CR electrons
+        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+
+        Outputs
+        ----------
+        - distribution (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
+
+        """
+
+        # In case the input is not an array
+        energy = model_tools.check_qarray(energy, unit='GeV')
+        radius = model_tools.check_qarray(radius, unit='kpc')   
+        
+        # Integrate over the considered volume
+        rad, f_r = self.get_normed_density_cre1_profile(radius)
+        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
+        
+        # energy
+        eng, f_E = self.get_normed_cre1_spectrum(energy)
+        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T=True)
+    
+        # compute the distrib
+        distribution = f_E2 * f_r2
+
+        return distribution * u.adu
+
 
     #==================================================
     # Get the CR proton normalization
@@ -665,18 +732,18 @@ class Physics(object):
         # Get the thermal energy
         rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
         
-        # Get the spatial form volume for CRp
+        # Get the 2d distribution
         rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
-        rad, f_cr_r = self.get_normed_density_crp_profile(rad)
-        Vcr = model_tools.trapz_loglog(4*np.pi*rad**2 * f_cr_r.to_value('adu'), rad)
-        
-        # Get the energy enclosed in the spectrum
         eng = model_tools.sampling_array(self._Epmin, self._Epmax, NptPd=self._Npt_per_decade_integ, unit=True)
-        eng, f_cr_E = self.get_normed_crp_spectrum(eng)
-        Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
+        f_cr_e_r = self.get_normed_crp_2d(eng, rad)
+
+        # Integrate over radius then energy
+        rad2d = model_tools.replicate_array(rad, len(eng), T=False)
+        f_cr_e = model_tools.trapz_loglog(4*np.pi*rad2d**2 * f_cr_e_r.to_value('adu'), rad2d, axis=1)
+        Icr = model_tools.trapz_loglog(eng * f_cr_e, eng)
         
         # Compute the normalization
-        Norm = self._X_crp_E['X'] * U_th / Vcr / Ienergy
+        Norm = self._X_crp_E['X'] * U_th / Icr
 
         return Norm.to('GeV-1 cm-3')
     
@@ -684,7 +751,7 @@ class Physics(object):
     #==================================================
     # Get the CR primary electron normalization
     #==================================================
-
+    
     def _get_cre1_normalization(self):
         """
         Compute the normalization of the cosmic ray primary electron distribution:
@@ -706,20 +773,34 @@ class Physics(object):
         # Get the thermal energy
         rad_uth, U_th = self.get_thermal_energy_profile(Rcut)
         
-        # Get the spatial form volume for CRp
+        # Get the 2d distribution
         rad = model_tools.sampling_array(self._Rmin, Rcut, NptPd=self._Npt_per_decade_integ, unit=True)
-        rad, f_cr_r = self.get_normed_density_cre1_profile(rad)
-        Vcr = model_tools.trapz_loglog(4*np.pi*rad**2 * f_cr_r.to_value('adu'), rad)
-        
-        # Get the energy enclosed in the spectrum
         eng = model_tools.sampling_array(self._Eemin, self._Eemax, NptPd=self._Npt_per_decade_integ, unit=True)
-        eng, f_cr_E = self.get_normed_cre1_spectrum(eng)
-        Ienergy = model_tools.trapz_loglog(eng * f_cr_E.to_value('adu'), eng)
+        f_cr_e_r = self.get_normed_cre1_2d(eng, rad)
+
+        # Integrate over radius then energy
+        rad2d = model_tools.replicate_array(rad, len(eng), T=False)
+        f_cr_e = model_tools.trapz_loglog(4*np.pi*rad2d**2 * f_cr_e_r.to_value('adu'), rad2d, axis=1)
+        Icr = model_tools.trapz_loglog(eng * f_cr_e, eng)
         
         # Compute the normalization
-        Norm = self._X_cre1_E['X'] * U_th / Vcr / Ienergy
+        Norm = self._X_cre1_E['X'] * U_th / Icr
 
         return Norm.to('GeV-1 cm-3')
+
+ 
+
+
+
+
+
+
+
+
+
+
+    
+
 
 
     #==================================================
@@ -737,29 +818,14 @@ class Physics(object):
 
         Outputs
         ----------
-        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
+        - distribution (quantity): in unit of GeV-1 cm-3, with distribution[i_energy, i_radius]
 
         """
-
-        # In case the input is not an array
-        energy = model_tools.check_qarray(energy, unit='GeV')
-        radius = model_tools.check_qarray(radius, unit='kpc')
         
-        # Get the normalization
         norm = self._get_crp_normalization()
-        
-        # Integrate over the considered volume
-        rad, f_r = self.get_normed_density_crp_profile(radius)
-        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T= False )
+        distribution = norm * self.get_normed_crp_2d(energy, radius).to_value('adu')
 
-        # Get the energy form
-        eng, f_E = self.get_normed_crp_spectrum(energy)
-        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T= True )
-
-        # compute the spectrum
-        spectrum = norm * f_E2 * f_r2
-
-        return spectrum.to('GeV-1 cm-3')
+        return distribution.to('GeV-1 cm-3')
 
 
     #==================================================
@@ -777,31 +843,14 @@ class Physics(object):
 
         Outputs
         ----------
-        - spectrum (quantity): in unit of GeV-1 cm-3, with spectrum[i_energy, i_radius]
+        - distribution (quantity): in unit of GeV-1 cm-3, with distribution[i_energy, i_radius]
 
         """
 
-        energy = model_tools.check_qarray(energy, unit='GeV')
-        radius = model_tools.check_qarray(radius, unit='kpc')   
-
-        norm = self._get_cre1_normalization() #From fit, it is norm = (2.07162116e-14)/u.GeV/u.cm**3
-        
-        # Integrate over the considered volume
-        rad, f_r = self.get_normed_density_cre1_profile(radius)
-        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T = False )
-        
-        # energy
-        eng, f_E = self.get_normed_cre1_spectrum(energy)
-        f_E2 = model_tools.replicate_array(f_E.to_value('adu'), len(radius), T = True )
-    
-        spectrum = norm * f_E2 * f_r2
+        norm = self._get_cre1_normalization()
+        distribution = norm * self.get_normed_cre1_2d(energy, radius).to_value('adu')
      
-        return spectrum.to('GeV-1 cm-3')
-
-
-
-
-
+        return distribution.to('GeV-1 cm-3')
 
 
 
