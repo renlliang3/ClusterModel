@@ -5,6 +5,7 @@ paper by Kelner et al. (2006).
 """
 
 import numpy as np
+import copy
 import scipy.integrate as integrate
 import scipy.interpolate as interpolate
 from astropy import units as u 
@@ -104,15 +105,24 @@ def momentumpowerlaw_model(energy_gev, k0, index,
     --------
     - spectrum
     """
+
+    E_gev = copy.copy(energy_gev)
+    wbad = energy_gev <= mass.to_value('GeV')
+    E_gev[wbad] = 2*mass.to_value('GeV') # avoid error, but should be set to zero
+
+    if E0 <= mass.to_value('GeV'):
+        raise ValueError('The pivot energy E0 should be larger than the particle mass')
     
     P0 = np.sqrt(E0**2 - (mass.to_value('GeV'))**2) / const.c.to_value('m/s')
     
-    momentum = np.sqrt(energy_gev**2 - (mass.to_value('GeV'))**2) / const.c.to_value('m/s')
+    momentum = np.sqrt(E_gev**2 - (mass.to_value('GeV'))**2) / const.c.to_value('m/s')
 
     fP = k0 * (momentum/P0)**(-index)
-    dP = (energy_gev/const.c.to_value('m/s'))  / np.sqrt(energy_gev**2 - (mass.to_value('GeV'))**2)
+    dP = (E_gev/const.c.to_value('m/s'))  / np.sqrt(E_gev**2 - (mass.to_value('GeV'))**2)
      
     SE = fP*dP
+    
+    SE[wbad] = 0
     
     return SE
 
@@ -140,8 +150,12 @@ def initial_injection_model(energy_gev, k0, index, Ebreak,
     - spectrum
     """
 
-    S = k0 * (energy_gev/E0)**(-index) * (1-energy_gev/Ebreak)**(index-2)
-    S[energy_gev > Ebreak] = 0
+    E_gev = copy.copy(energy_gev)
+    wbad = energy_gev > Ebreak
+    E_gev[wbad] = Ebreak/2.0 # avoid error, but should be set to zero
+
+    S = k0 * (E_gev/E0)**(-index) * (1-E_gev/Ebreak)**(index-2)
+    S[wbad] = 0
     
     return S
 
@@ -169,11 +183,17 @@ def continuous_injection_model(energy_gev, k0, index, Ebreak,
     - spectrum
     """
 
-    f1 = k0 * (energy_gev/E0)**(-index-1)
-    f2 = 1 - (1-energy_gev/Ebreak)**(index-1)
+    energy_gev_1 = copy.copy(energy_gev)
+    energy_gev_2 = copy.copy(energy_gev)
+    w1 = energy_gev >= Ebreak
+    w2 = energy_gev < Ebreak
+    energy_gev_2[w1] = Ebreak/2.0
+
+    f1 = k0 * (energy_gev_1/E0)**(-index-1)
+    f2 = 1 - (1-energy_gev_2/Ebreak)**(index-1)
     S = energy_gev*0
-    S[energy_gev >= Ebreak] = f1[energy_gev >= Ebreak]
-    S[energy_gev < Ebreak] = (f1*f2)[energy_gev < Ebreak]
+    S[w1] = f1[w1]
+    S[w2] = (f1*f2)[w2]
     
     return S
 
