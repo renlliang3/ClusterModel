@@ -190,7 +190,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Eemin = (const.m_e *const.c**2).to('GeV')
         self._Eemax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
-        self._coolcore = False 
 
         # Initialize the profile model (not useful but for clarity of variables)
         self._pressure_gas_model = 1
@@ -213,7 +212,9 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 	# Cosmic ray primary electrons
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
                                      'PivotEnergy': 1.0*u.TeV,
-                                     'Index'      : 3.0}    
+                                     'Index'      : 3.0}
+        self._apply_cre1_loss = False
+        
         #---------- Sampling
         self._Npt_per_decade_integ = 30
         self._map_coord  = SkyCoord(RA, Dec, frame="icrs")
