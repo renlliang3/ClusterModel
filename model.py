@@ -81,6 +81,9 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     - Eemax (quantity): the maximal energy of primary electrons (default is 10 PeV) 
     - pp_interaction_model (str) : model for particle physics parametrisation of pp 
     interactions. Available are 'Pythia8', 'SIBYLL', 'QGSJET', 'Geant4'.
+    - cre1_loss_model (str): what kind of loss to apply on the primary CR distribution. If 
+    None, the distribution is expected to be already dN/dEdV, else it is the injection rate 
+    dN/dEdVdt
 
     - pressure_gas_model (dict): the model used for the thermal gas electron pressure 
     profile. It contains the name of the model and the associated model parameters. 
@@ -190,6 +193,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         self._Eemin = (const.m_e *const.c**2).to('GeV')
         self._Eemax = 10.0 * u.PeV
         self._pp_interaction_model = 'Pythia8'
+        self._cre1_loss_model = 'None'
 
         # Initialize the profile model (not useful but for clarity of variables)
         self._pressure_gas_model = 1
@@ -213,7 +217,6 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 	self._spectrum_cre1_model = {'name'       : 'PowerLaw',
                                      'PivotEnergy': 1.0*u.TeV,
                                      'Index'      : 3.0}
-        self._cre1_losses = None
         
         #---------- Sampling
         self._Npt_per_decade_integ = 30
@@ -397,6 +400,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     def spectrum_cre1_model(self):
         if not self._silent: print("Getting the cosmic ray primary electron spectrum parameters value")
         return self._spectrum_cre1_model
+
+    @property
+    def cre1_loss_model(self):
+        if not self._silent: print("Getting the CRe1 loss model")
+        return self._cre1_loss_model
 
     #========== Maps parameters
     @property
@@ -1000,6 +1008,25 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
         # Information
         if not self._silent: print("Setting density_cre1_model value")
 
+    @cre1_loss_model.setter
+    def cre1_loss_model(self, value):
+        # Check type
+        if type(value) != str:
+            raise TypeError("The CRe1 loss model should be a string")
+
+        # Check value
+        llist = ['None', 'Steady', 'Initial']
+        if not value in llist:
+            print('CRe1 loss model available models are:')
+            print(llist)
+            raise ValueError("This loss model is not available")
+        
+        # Setting parameters
+        self._cre1_loss_model = value
+        
+        # Information
+        if not self._silent: print("Setting cre1_loss_model value")
+        
     #========== Sampling
     @Npt_per_decade_integ.setter
     def Npt_per_decade_integ(self, value):
