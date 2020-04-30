@@ -623,20 +623,26 @@ class Physics(object):
 
         # In case losses are applied, energy range should extend because it is integrated up to infinity
         if self._cre1_loss_model is not 'None':
-            print('ToDo')
+            emin = np.amax([(const.m_e*const.c**2).to_value('GeV'),
+                            np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
+            emax = self._Eemax
+            eng = model_tools.sampling_array(emin, emax, NptPd=self._Npt_per_decade_integ, unit=True)
+            rad = copy.copy(radius)
         else:
-            print('Done')
-        
+            # The distribution does not need integration, keep initial requested energy and radius
+            eng = copy.copy(energy)
+            rad = copy.copy(radius)
+            
         # get profile
-        f_r = self._get_generic_profile(radius, self._density_cre1_model)
-        f_r[radius > self._R_truncation] *= 0 
-        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(energy), T=False)
+        f_r = self._get_generic_profile(rad, self._density_cre1_model)
+        f_r[rad > self._R_truncation] *= 0 
+        f_r2 = model_tools.replicate_array(f_r.to_value('adu'), len(eng), T=False)
         
         # get spectrum
-        f_E = self._get_generic_spectrum(energy, self._spectrum_cre1_model)
-        f_E[energy > self._Eemax] *= 0
-        f_E[energy < self._Eemin] *= 0
-        f_E2 = model_tools.replicate_array(f_E, len(radius), T=True)
+        f_E = self._get_generic_spectrum(eng, self._spectrum_cre1_model)
+        f_E[eng > self._Eemax] *= 0
+        f_E[eng < self._Eemin] *= 0
+        f_E2 = model_tools.replicate_array(f_E, len(rad), T=True)
     
         # compute the distrib
         distribution = f_E2 * f_r2
@@ -644,7 +650,8 @@ class Physics(object):
         # Apply losses to the distribution if needed
         if self._cre1_loss_model is not 'None':
             if self._cre1_loss_model == 'Steady':
-                distribution = self.apply_steady_state_electron_loss(energy, radius, distribution)
+                distribution = self.apply_steady_state_electron_loss(energy, radius,
+                                                                     distribution*u.adu, eng, rad)
                 distribution = distribution.value
             if self._cre1_loss_model == 'Injection':
                 print('Not implemented, keep the initial distribution')
@@ -656,14 +663,20 @@ class Physics(object):
     # Apply steady state losses to a given injection rate
     #==================================================
      
-    def apply_steady_state_electron_loss(self, energy, radius, dN_dEdVdt):
+    def apply_steady_state_electron_loss(self, energy, radius,
+                                         dN_dEdVdt, eng, rad):
         """
-        Compute the cosmic ray proton 2d distribution, but normalized.
+        Apply steady state solution to get dN/dEdV from dN/dEdVdt
+        The steady state solution is used:  dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
+        See e.g. Sarrazin (1999) eq 38.
         
         Parameters
         ----------
-        - energy (quantity) : the physical energy of CR protons
-        - radius (quantity): the physical 3d radius in units homogeneous to kpc, as a 1d array
+        - energy (quantity) : the physical energy of the output
+        - radius (quantity): the physical 3d radius of the output
+        - dN_dEdVdt (quantity): the rate of injection
+        - eng (quantity): the energy associated to dN_dEdVdt
+        - rad (quantity): the radius associated to dN_dEdVdt
 
         Outputs
         ----------
@@ -683,20 +696,21 @@ class Physics(object):
         dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
 
         # Compute the integral \int_E^\infty Q(E) dE
-        dN_dEdVdt_integrated = copy.copy(dN_dEdVdt) # No integration now
+        dN_dEdVdt_integrated = np.zeros((len(energy),len(radius)))* dN_dEdVdt.unit*eng.unit
+        eng_grid = model_tools.replicate_array(eng, len(rad), T=True) # eng, but replicated along rad
 
-        #for i in range(len(energy)):
-        #    dN_dEdVdt_i = dN_dEdVdt.copy()
-        #    dN_dEdVdt_i[eng_grid < energy[i]] *= 0
-        #    dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
+        for i in range(len(energy)):
+            dN_dEdVdt_i = dN_dEdVdt.copy()
+            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
+            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
 
         # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
         energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
-        w_neg = energy_grid <= const.m_e*const.c**2 # flag energies that are not possible
+        w_neg = energy_grid < max(const.m_e*const.c**2, self._Eemin) # flag energies that are not possible
         dEdt[w_neg] = 1*dEdt.unit
         dN_dEdV = dN_dEdVdt_integrated / dEdt
         dN_dEdV[w_neg] = 0
-
+        
         return dN_dEdV
     
     
@@ -778,7 +792,6 @@ class Physics(object):
         
         # Compute the normalization
         Norm = self._X_cre1_E['X'] * U_th / Icr
-        print('Norm', Norm)
 
         return Norm.to('GeV-1 cm-3')
     
@@ -1404,7 +1417,6 @@ class Physics(object):
         else:
             raise ValueError('Only Kafexhiu2014 and Kelner2006 models are available.')
 
-
         return dN_dEdVdt.to('GeV-1 cm-3 s-1')
 
 
@@ -1415,8 +1427,6 @@ class Physics(object):
     def get_cre2_2d(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
         """
         Compute the electron spectrum as dN/dEdV = f(E, r)
-        The steady state solution is used:  dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
-        See e.g. Sarrazin (1999) eq 38.
         
         Parameters
         ----------
@@ -1425,7 +1435,7 @@ class Physics(object):
 
         Outputs
         -------
-        - dNg_dEdV (np.ndarray): the differntial production rate
+        - dN_dEdV (np.ndarray): the number of electrons per unit volume and energy
 
         """
         
@@ -1433,38 +1443,15 @@ class Physics(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')
 
-        # Get the necessary quantity
-        radius, n_e = self.get_density_gas_profile(radius)
-        radius, B   = self.get_magfield_profile(radius)
-
-        # Compute the losses
-        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
-
         # Get the injection rate between the min and max possible, i.e. Epmax
         emin = np.amax([(const.m_e*const.c**2).to_value('GeV'),
                         np.amin(energy.to_value('GeV'))])*u.GeV # min of CRe energy requested, or m_e c^2
         emax = self._Epmax
         eng = model_tools.sampling_array(emin, emax, NptPd=self._Npt_per_decade_integ, unit=True)
         dN_dEdVdt = self.get_rate_cre2(eng, radius) # This is the time consumming part
-        eng_grid = model_tools.replicate_array(eng, len(radius), T=True)
 
-        # Integrated cumulatively over the energy
-        dN_dEdVdt_integrated = np.zeros((len(energy),len(radius))) * u.cm**-3*u.s**-1
-        
-        for i in range(len(energy)):
-            # Set out of limit values to 0
-            dN_dEdVdt_i = dN_dEdVdt.copy()
-            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
-            
-            # Compute integral
-            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
-
-        # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
-        energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
-        w_neg = energy_grid <= const.m_e*const.c**2 # flag energies that are not possible
-        dEdt[w_neg] = 1*dEdt.unit
-        dN_dEdV = dN_dEdVdt_integrated / dEdt
-        dN_dEdV[w_neg] = 0
+        # Apply the losses
+        dN_dEdV = self.apply_steady_state_electron_loss(energy, radius, dN_dEdVdt, eng, radius)
         
         return dN_dEdV.to('GeV-1 cm-3')
 
