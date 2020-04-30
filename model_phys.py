@@ -94,7 +94,8 @@ class Physics(object):
     - get_density_cre1_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None, 
     Energy_density=False): compute the cosmic ray primary electron density profile integrating over the energy 
     between Emin and Emax.
-    - get_cre1_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV, Rmax=None): compute the cosmic ray primary electron
+    - get_cre1_spectrum(self, energy=np.logspace(-2,7,1000)*u.GeV, Rmax=None): compute the cosmic 
+    ray primary electron
     spectrum integrating over the volume up to Rmax
     - get_cre1_to_thermal_energy_profile(self, radius=np.logspace(0,4,1000)*u.kpc, Emin=None, Emax=None):
     compute the cosmic ray primary electron energy (between Emin and Emax) to thermal energy profile.
@@ -119,7 +120,8 @@ class Physics(object):
     - get_rate_ic(self, energy=np.logspace(-2,7,100)*u.GeV, radius=np.logspace(0,4,100)*u.kpc):
     compute the inverse compton emission per unit volume given the electron population and CMB(z)
 
-    - get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc, Compton_only=False):
+    - get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc, 
+    Compton_only=False):
     Compute the SZ emission per cm3
 
     - make_xspec_table(self, Emin=0.1*u.keV, Emax=2.4*u.keV,Tmin=0.1*u.keV, Tmax=50.0*u.keV, nbin=100,
@@ -285,8 +287,8 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
 
         #---------- Get the electron density profile
         radius, n_r = self.get_density_gas_profile(radius=radius)
@@ -327,8 +329,9 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
 
         # Compute delta from the mass profile
-        r, mhse = self.get_hse_mass_profile(radius)       
-        delta_r = mhse/(1.0-self._hse_bias) / (4.0/3.0*np.pi*radius**3 * self._cosmo.critical_density(self._redshift))
+        r, mhse = self.get_hse_mass_profile(radius)
+        rho_c = self._cosmo.critical_density(self._redshift)
+        delta_r = mhse/(1.0-self._hse_bias) / (4.0/3.0*np.pi*radius**3 * rho_c)
 
         return radius, delta_r.to_value('')*u.adu
 
@@ -376,6 +379,46 @@ class Physics(object):
 
 
     #==================================================
+    # Set b_hse given M500 and Mhse profile
+    #==================================================
+
+    def set_hsebias_from_m500_and_mhse(self):
+        """
+        Set the HSE mass bias given the mass parameter M500 and the Mhse profile.
+        
+        Parameters
+        ----------
+        
+        Outputs
+        ----------
+        
+        """
+        
+        M_HSE_R500 = self.get_hse_mass_profile(self._R500)[1][0]
+        self._hse_bias = 1 - M_HSE_R500.to_value('Msun') / self._M500.to_value('Msun')
+
+
+    #==================================================
+    # Set M500 given b_hse and M_hse profile
+    #==================================================
+
+    def set_m500_from_bhse_and_mhse(self):
+        """
+        Set the value of M500 given the HSE bias and the HSE mass profile.
+        
+        Parameters
+        ----------
+        
+        Outputs
+        ----------
+        
+        """
+
+        R500, M500 = self.get_mdelta_from_profile(delta=500, Rmin=10*u.kpc, Rmax=1e4*u.kpc)
+        self.M500 = M500 # R500 set automatically
+        
+        
+    #==================================================
     # Compute Mgas
     #==================================================
     def get_gas_mass_profile(self, radius=np.logspace(0,4,100)*u.kpc):
@@ -397,13 +440,14 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
         
         #---------- Integrate the mass
         I_n_gas_r = np.zeros(len(radius))
         for i in range(len(radius)):
-            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            # make sure we go well bellow rmax
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc 
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
             # To avoid ringing at Rtrunc, insert it if we are above
             if np.amax(rad) > self._R_truncation:
@@ -469,13 +513,14 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         #---------- Mean molecular weights
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
 
         #---------- Integrate the pressure in 3d
         Uth_r = np.zeros(len(radius))*u.erg
         for i in range(len(radius)):
-            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            # make sure we go well bellow rmax
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc 
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
             # To avoid ringing at Rtrunc, insert it if we are above
             if np.amax(rad) > self._R_truncation:
@@ -602,11 +647,11 @@ class Physics(object):
         
         return distribution * u.adu
     
-
+    
     #==================================================
     # Apply steady state losses to a given injection rate
     #==================================================
-    
+    '''   
     def apply_steady_state_electron_loss(self, energy, radius, dN_dEdVdt):
         """
         Compute the cosmic ray proton 2d distribution, but normalized.
@@ -650,7 +695,7 @@ class Physics(object):
         dN_dEdV[w_neg] = 0
 
         return dN_dEdV
-
+    '''
 
 
     
@@ -825,7 +870,8 @@ class Physics(object):
         dN_dEdV = self.get_crp_2d(eng, radius)
 
         if Energy_density:
-            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
+            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV,
+                                                eng, axis=0)).to('GeV cm-3')            
         else:
             profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis=0)).to('cm-3')
             
@@ -873,7 +919,8 @@ class Physics(object):
     
         #Integrate the diffferential spectrum 
         if Energy_density:
-            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng , axis =0)).to('GeV cm-3')
+            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV,
+                                                eng , axis =0)).to('GeV cm-3')
 
         else:
             profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis = 0)).to('cm-3')
@@ -910,7 +957,7 @@ class Physics(object):
             Rmax = self._R500
                 
         # Define the radius for integration
-        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
+        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc # make sure we go low enough
         rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
 
         # To improve precision around R_truncation in integration
@@ -996,7 +1043,7 @@ class Physics(object):
         # In case the input is not an array
         radius = model_tools.check_qarray(radius, unit='kpc')
 
-        # Define energy (going below/above Epmin/Epmax only introduces more integration error because of discountinuity)
+        # Define energy (going beyond Epmin/Epmax only introduces more integration error because of discountinuity)
         if Emin is None or Emin < self._Epmin:
             Emin = self._Epmin
         if Emax is None or Emax > self._Epmax:
@@ -1008,7 +1055,8 @@ class Physics(object):
         # Integrate CR energy density profile
         Ucr_r = np.zeros(len(radius))*u.GeV
         for i in range(len(radius)):
-            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            # make sure we go well bellow rmax
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc 
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
             # To avoid ringing at Rtrunc, insert it if we are above
             if np.amax(rad) > self._R_truncation:
@@ -1048,7 +1096,7 @@ class Physics(object):
         # In case the input is not an array
         radius = model_tools.check_qarray(radius, unit='kpc')
 
-        # Define energy (going below/above Eemin/Eemax only introduces more integration error because of discountinuity)
+        # Define energy (going beyond Eemin/Eemax only introduces more integration error because of discountinuity)
         if Emin is None or Emin < self._Eemin:
             Emin = self._Eemin
         if Emax is None or Emax > self._Eemax:
@@ -1060,7 +1108,8 @@ class Physics(object):
         # Integrate CR energy density profile
         Ucr_r = np.zeros(len(radius))*u.GeV
         for i in range(len(radius)):
-            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            # make sure we go well bellow rmax
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc 
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
             # To avoid ringing at Rtrunc, insert it if we are above
             if np.amax(rad) > self._R_truncation:
@@ -1112,7 +1161,8 @@ class Physics(object):
         # Integrate CR energy density profile
         Ucr_r = np.zeros(len(radius))*u.GeV
         for i in range(len(radius)):
-            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc # make sure we go well bellow rmax
+            # make sure we go well bellow rmax
+            rmin = np.amin([self._Rmin.to_value('kpc'), radius.to_value('kpc')[i]/10.0])*u.kpc 
             rad = model_tools.sampling_array(rmin, radius[i], NptPd=self._Npt_per_decade_integ, unit=True)
             # To avoid ringing at Rtrunc, insert it if we are above
             if np.amax(rad) > self._R_truncation:
@@ -1154,8 +1204,8 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Get the thermal proton density profile
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
         rad, n_e  = self.get_density_gas_profile(radius)
         n_H = n_e * mu_e/mu_p
 
@@ -1223,8 +1273,8 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Get the thermal proton density profile
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
         rad, n_e  = self.get_density_gas_profile(radius)
         n_H = n_e * mu_e/mu_p
 
@@ -1293,8 +1343,8 @@ class Physics(object):
         radius = model_tools.check_qarray(radius, unit='kpc')
         
         # Get the thermal proton density profile
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
         rad, n_e  = self.get_density_gas_profile(radius)
         n_H = n_e * mu_e/mu_p
 
@@ -1456,7 +1506,8 @@ class Physics(object):
         dN_dEdV = self.get_cre2_2d(eng, radius)
 
         if Energy_density:
-            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV, eng, axis=0)).to('GeV cm-3')            
+            profile = (model_tools.trapz_loglog(np.vstack(eng.to_value('GeV'))*u.GeV * dN_dEdV,
+                                                eng, axis=0)).to('GeV cm-3')            
         else:
             profile = (model_tools.trapz_loglog(dN_dEdV, eng, axis=0)).to('cm-3')
             
@@ -1492,7 +1543,7 @@ class Physics(object):
             Rmax = self._R500
                 
         # Integrate over the considered volume
-        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc #In case of small Rmax, make sure we go low enough
+        rmin = np.amin([self._Rmin.to_value('kpc'), Rmax.to_value('kpc')/10])*u.kpc # make sure we go low enough
         rad = model_tools.sampling_array(rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
 
         # To improve precision around R_truncation in integration
@@ -1616,7 +1667,8 @@ class Physics(object):
     # Get the SZ rate
     #==================================================
     
-    def get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc, Compton_only=False):
+    def get_rate_sz(self, frequency=np.logspace(1,3,100)*u.GHz, radius=np.logspace(0,4,100)*u.kpc,
+                    Compton_only=False):
         """
         Compute the SZ emission per unit volume, or the Compton parameter per unit distance.
         
@@ -1651,11 +1703,13 @@ class Physics(object):
 
         # Get SZ power per unit volume and frequency
         if Compton_only:
-            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure,
+                                                  len(frequency), T=False)
             #compton_relat = compton * f_nu/f_nu0
             output = compton.to('kpc-1')
         else:
-            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure, len(frequency), T=False)
+            compton = model_tools.replicate_array(const.sigma_T/(const.m_e*const.c**2) * pressure,
+                                                  len(frequency), T=False)
             dE_dtdVdfdO = compton * I0*f_nu
             output = dE_dtdVdfdO.to('eV s-1 cm-3 Hz-1 sr-1')
             
@@ -1867,8 +1921,8 @@ class Physics(object):
             raise ValueError(msg)
 
         # Get the the Xspec normalization
-        mu_gas, mu_e, mu_p, mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
-                                                                            Z=self._metallicity_sol*self._abundance)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
         xspec_norm = 1e-14/(4*np.pi*self._D_ang**2*(1+self._redshift)**2) * n_e**2*mu_e/mu_p 
 
         # Compute norm * counts as dN/dtdS/dV and convert do dN/dVdt via D_lum
