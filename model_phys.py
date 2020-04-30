@@ -9,6 +9,7 @@ is dedicated to the computing of the physical properties of clusters.
 #==================================================
 
 import numpy as np
+import copy
 from scipy.optimize import brentq
 import scipy.interpolate as interpolate
 import scipy.ndimage as ndimage
@@ -620,7 +621,7 @@ class Physics(object):
         energy = model_tools.check_qarray(energy, unit='GeV')
         radius = model_tools.check_qarray(radius, unit='kpc')
 
-        # In case losses are applied, energy range should extend
+        # In case losses are applied, energy range should extend because it is integrated up to infinity
         if self._cre1_loss_model is not 'None':
             print('ToDo')
         else:
@@ -640,18 +641,21 @@ class Physics(object):
         # compute the distrib
         distribution = f_E2 * f_r2
 
-        # Apply losses to the distribution
+        # Apply losses to the distribution if needed
         if self._cre1_loss_model is not 'None':
             if self._cre1_loss_model == 'Steady':
                 distribution = self.apply_steady_state_electron_loss(energy, radius, distribution)
-        
+                distribution = distribution.value
+            if self._cre1_loss_model == 'Injection':
+                print('Not implemented, keep the initial distribution')
+
         return distribution * u.adu
     
     
     #==================================================
     # Apply steady state losses to a given injection rate
     #==================================================
-    '''   
+     
     def apply_steady_state_electron_loss(self, energy, radius, dN_dEdVdt):
         """
         Compute the cosmic ray proton 2d distribution, but normalized.
@@ -678,14 +682,13 @@ class Physics(object):
         # Get the losses
         dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
 
+        # Compute the integral \int_E^\infty Q(E) dE
+        dN_dEdVdt_integrated = copy.copy(dN_dEdVdt) # No integration now
 
-        for i in range(len(energy)):
-            # Set out of limit values to 0
-            dN_dEdVdt_i = dN_dEdVdt.copy()
-            dN_dEdVdt_i[eng_grid < energy[i]] *= 0
-            
-            # Compute integral
-            dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
+        #for i in range(len(energy)):
+        #    dN_dEdVdt_i = dN_dEdVdt.copy()
+        #    dN_dEdVdt_i[eng_grid < energy[i]] *= 0
+        #    dN_dEdVdt_integrated[i,:] = model_tools.trapz_loglog(dN_dEdVdt_i, eng, axis=0)
 
         # Compute the solution the equation: dN/dEdV(E,r) = 1/L(E,r) * \int_E^\infty Q(E) dE
         energy_grid = model_tools.replicate_array(energy, len(radius), T=True)
@@ -695,11 +698,8 @@ class Physics(object):
         dN_dEdV[w_neg] = 0
 
         return dN_dEdV
-    '''
-
-
     
-
+    
     #==================================================
     # Get the CR proton normalization
     #==================================================
@@ -778,6 +778,7 @@ class Physics(object):
         
         # Compute the normalization
         Norm = self._X_cre1_E['X'] * U_th / Icr
+        print('Norm', Norm)
 
         return Norm.to('GeV-1 cm-3')
     
