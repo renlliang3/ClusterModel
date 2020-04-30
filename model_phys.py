@@ -1774,7 +1774,8 @@ class Physics(object):
                                                       fov=fov, reso=reso,
                                                       save_file=None, visu=visu_nH)
             if nH2use/nH2use_err < 5 :
-                print('!!! WARNING, nH is not well constain in the field (mean/rms < 5) and nH='+str(nH2use)+' 10^22 cm-2.')
+                print('!!! WARNING, nH is not well constrain in the field:')
+                print('mean/rms < 5 and nH='+str(nH2use)+' 10^22 cm-2.')
 
         # Or give nH directly
         elif nH != None:
