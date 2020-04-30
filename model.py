@@ -39,6 +39,11 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
     mass and redshift, it includes the physical properties (e.g. pressure profile, 
     cosmic ray spectrum) from which derived properties can be obtained (e.g. 
     hydrostatic mass profile) as well as observables.
+
+    To do
+    -----
+    - Make sure Epmin and Eemin are fine wrt integration of distribution
+    - Check the effect of E{e/p}min on gamma ray interaction (i.e. v~c approx)
         
     Attributes
     ----------  
