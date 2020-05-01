@@ -3,6 +3,7 @@ This file deals with 'model parameters' issues regarding the Cluster Class (e.g.
 """
 import astropy.units as u
 import numpy as np
+from scipy import interpolate
 
 from ClusterModel.ClusterTools import cluster_global
 from ClusterModel.ClusterTools import cluster_profile 
@@ -303,9 +304,9 @@ class Modpar(object):
                 raise TypeError("radius should be homogeneous to kpc")
 
             # Check values
-            if np.amin(inpar['radius'].value) < 0:
+            if np.amin(inpar['radius']) < 0:
                 raise ValueError("radius should be >= 0")
-            if np.amin(inpar['profile'].value) < 0:
+            if np.amin(inpar['profile']) < 0:
                 raise ValueError("profile should be larger >= 0")                   
 
             if hasunit:
@@ -479,11 +480,11 @@ class Modpar(object):
                 raise TypeError("energy should be homogeneous to GeV")
 
             # Check values
-            if np.amin(inpar['energy'].value) < 0:
+            if np.amin(inpar['energy']) < 0:
                 raise ValueError("energy should be >= 0")
-            if np.amin(inpar['spectrum'].value) < 0:
+            if np.amin(inpar['spectrum']) < 0:
                 raise ValueError("spectrum should be larger >= 0")                   
-
+            
             if hasunit:
                 spec = inpar['spectrum'].to(unit)
             else:
@@ -960,7 +961,7 @@ class Modpar(object):
 
         """
 
-        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta']
+        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta', 'User']
 
         if not model['name'] in model_list:
             print('The profile model can :')
@@ -1036,7 +1037,27 @@ class Modpar(object):
                 prof_r1 = cluster_profile.beta_model(r3d_kpc, n01, rc1, beta1)*unit1
                 prof_r2 = cluster_profile.beta_model(r3d_kpc, n02, rc2, beta2)*unit2
                 prof_r = prof_r1 + prof_r2
+
+        #---------- User model
+        elif model['name'] == 'User':
+            user_r = model["radius"].to_value('kpc')
+            user_p = model["profile"].value
+
+            # Interpolation
+            f = interpolate.interp1d(user_r, user_p, kind='linear', fill_value='extrapolate')
+            pitpl_r = f(r3d_kpc)
+            if np.amin(user_r) > np.amin(r3d_kpc) or np.amax(user_r) < np.amax(r3d_kpc): 
+                print('WARNING: User model interpolated beyond the provided range!')
+
+            # Correct for negative value
+            pitpl_r[pitpl_r<0] = 0
             
+            # Numerical derivative
+            if derivative:
+                prof_r = np.gradient(pitpl_r, r3f_kpc)*u.Unit('kpc-1')*model["profile"].unit
+            else:
+                prof_r = pitpl_r*model["profile"].unit
+
         #---------- Otherwise nothing is done
         else :
             if not self._silent: print('The requested model has not been implemented.')
@@ -1065,7 +1086,8 @@ class Modpar(object):
         """
 
         model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw',
-                      'InitialInjection', 'ContinuousInjection']
+                      'InitialInjection', 'ContinuousInjection',
+                      'User']
 
         if not model['name'] in model_list:
             print('The spectral model can :')
@@ -1102,7 +1124,24 @@ class Modpar(object):
             index  = model["Index"]
             Ebreak  = model["BreakEnergy"].to_value('GeV')
             S_E = cluster_spectra.continuous_injection_model(eng_GeV, 1.0, index, Ebreak)
-            
+
+        #---------- User model
+        elif model['name'] == 'User':
+            user_e = model["energy"].to_value('GeV')
+            user_s = model["spectrum"].value
+
+            # Interpolation
+            f = interpolate.interp1d(user_e, user_s, kind='linear', fill_value='extrapolate')
+            sitpl_e = f(eng_GeV)
+            if np.amin(user_e) > np.amin(eng_GeV) or np.amax(user_e) < np.amax(eng_GeV): 
+                print('WARNING: User model interpolated beyond the provided range!')
+
+            # Correct for negative value
+            sitpl_e[sitpl_e<0] = 0
+
+            # Output
+            S_E = sitpl_e#*model["spectrum"].unit
+
         #---------- Otherwise nothing is done
         else :
             if not self._silent: print('The requested model has not been implemented.')
