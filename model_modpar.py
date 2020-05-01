@@ -32,16 +32,24 @@ class Modpar(object):
     - _validate_spectrum_model_parameters(self, inpar, unit): dedicated to check and validate the parameters 
     of spectral models
 
-    - set_pressure_gas_gNFW_param(self, pressure_model='P13UPP'): set the gas pressure profile parameters to the 
-    universal value from different results
-    - set_pressure_gas_isoT_param(self, kBT): set gas pressure profile parameters so that the cluster is isothermal
-    - set_density_gas_isoT_param(self, kBT): set gas density profile parameters so that the cluster is isothermal
-    - set_density_crp_isobaric_scal_param(self, scal=1.0): set CRp densitry profile parameters to have isobaric scaling
-    - set_density_cre1_isobaric_scal_param(self, scal=1.0): set CRe1 densitry profile parameters to have isobaric scaling
-    - set_density_crp_isodens_scal_param(self, scal=1.0): set CRp densitry profile parameters to have isodensity scaling
-    - set_density_cre1_isodens_scal_param(self, scal=1.0): set CRe1 densitry profile parameters to have isodensity scaling
-    - set_magfield_isobaric_scal_param(self, Bnorm, scal=0.5): set mag field profile parameters to have isobaric scaling
-    - set_magfield_isodens_scal_param(self, Bnorm, scal=0.5): set mag field profile parameters to have isodensity scaling
+    - set_pressure_gas_gNFW_param(self, pressure_model='P13UPP'): set the gas pressure 
+    profile parameters to the universal value from different results
+    - set_pressure_gas_isoT_param(self, kBT): set gas pressure profile parameters so 
+    that the cluster is isothermal
+    - set_density_gas_isoT_param(self, kBT): set gas density profile parameters so that 
+    the cluster is isothermal
+    - set_density_crp_isobaric_scal_param(self, scal=1.0): set CRp densitry profile 
+    parameters to have isobaric scaling
+    - set_density_cre1_isobaric_scal_param(self, scal=1.0): set CRe1 densitry profile 
+    parameters to have isobaric scaling
+    - set_density_crp_isodens_scal_param(self, scal=1.0): set CRp densitry profile 
+    parameters to have isodensity scaling
+    - set_density_cre1_isodens_scal_param(self, scal=1.0): set CRe1 densitry profile 
+    parameters to have isodensity scaling
+    - set_magfield_isobaric_scal_param(self, Bnorm, scal=0.5): set mag field profile 
+    parameters to have isobaric scaling
+    - set_magfield_isodens_scal_param(self, Bnorm, scal=0.5): set mag field profile 
+    parameters to have isodensity scaling
     
     - _get_generic_profile(self, radius, model, derivative=False): get any profile base on model type
 
@@ -67,7 +75,7 @@ class Modpar(object):
         """
 
         # List of available authorized models
-        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta']
+        model_list = ['GNFW', 'SVM', 'beta', 'doublebeta', 'User']
         
         # Deal with unit
         if unit == '' or unit == None:
@@ -97,7 +105,7 @@ class Modpar(object):
             cond3 = not('c500' in inpar.keys() and 'r_p' in inpar.keys())
 
             if not (cond1 and cond2 and cond3):
-                raise ValueError("The GNFW model should contain: {'P_0','c500' or 'r_p' (not both), 'a', 'b', 'c'}.")
+                raise ValueError("The GNFW model should contain: {'P_0','c500' or 'r_p' (not both),'a','b','c'}.")
             
             # Check units and values
             if hasunit:
@@ -276,6 +284,40 @@ class Modpar(object):
                       "r_c2"  : inpar['r_c2'].to('kpc'),
                       "beta2" : inpar['beta2']}
 
+        #---------- Deal with the case of User
+        if inpar['name'] == 'User':
+            # Check the content of the dictionary
+            cond1 = 'radius' in inpar.keys() and 'profile' in inpar.keys()
+            if not cond1:
+                raise ValueError("The User model should contain: {'radius','profile'}.")
+
+            # Check units
+            if hasunit:
+                try:
+                    test = inpar['profile'].to(unit)
+                except:
+                    raise TypeError("profile should be homogeneous to "+unit)
+            try:
+                test = inpar['radius'].to('kpc')
+            except:
+                raise TypeError("radius should be homogeneous to kpc")
+
+            # Check values
+            if np.amin(inpar['radius'].value) < 0:
+                raise ValueError("radius should be >= 0")
+            if np.amin(inpar['profile'].value) < 0:
+                raise ValueError("profile should be larger >= 0")                   
+
+            if hasunit:
+                prof = inpar['profile'].to(unit)
+            else:
+                prof = inpar['profile']*u.adu
+
+            # All good at this stage, setting parameters
+            outpar = {"name"    : 'User',
+                      "radius"  : inpar['radius'].to('kpc'),
+                      "profile" : prof}
+            
         return outpar
 
 
@@ -300,7 +342,8 @@ class Modpar(object):
         
         # List of available authorized models
         model_list = ['PowerLaw', 'ExponentialCutoffPowerLaw', 'MomentumPowerLaw',
-                      'InitialInjection', 'ContinuousInjection']
+                      'InitialInjection', 'ContinuousInjection',
+                      'User']
         
         # Deal with unit
         if unit == '' or unit == None:
@@ -416,6 +459,40 @@ class Modpar(object):
             outpar = {"name"       : 'ContinuousInjection',
                       "Index"      : inpar['Index'],
                       "BreakEnergy": inpar['BreakEnergy'].to('TeV')}
+
+        #---------- Deal with the case of User
+        if inpar['name'] == 'User':
+            # Check the content of the dictionary
+            cond1 = 'energy' in inpar.keys() and 'spectrum' in inpar.keys()
+            if not cond1:
+                raise ValueError("The User model should contain: {'energy','spectrum'}.")
+
+            # Check units
+            if hasunit:
+                try:
+                    test = inpar['spectrum'].to(unit)
+                except:
+                    raise TypeError("spectrum should be homogeneous to "+unit)
+            try:
+                test = inpar['energy'].to('GeV')
+            except:
+                raise TypeError("energy should be homogeneous to GeV")
+
+            # Check values
+            if np.amin(inpar['energy'].value) < 0:
+                raise ValueError("energy should be >= 0")
+            if np.amin(inpar['spectrum'].value) < 0:
+                raise ValueError("spectrum should be larger >= 0")                   
+
+            if hasunit:
+                spec = inpar['spectrum'].to(unit)
+            else:
+                spec = inpar['spectrum']*u.adu
+
+            # All good at this stage, setting parameters
+            outpar = {"name"     : 'User',
+                      "energy"   : inpar['energy'].to('GeV'),
+                      "spectrum" : spec}
             
         return outpar
 
