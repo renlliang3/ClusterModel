@@ -916,7 +916,7 @@ class Modpar(object):
             Ppar['profile'] = (Ppar['profile'].to_value('keV cm-3'))**scal
 
             f = interpolate.interp1d(np.log10(Ppar['radius'].to_value('kpc')),
-                                     np.log10(Ppar['profile']), kind='quadratic', fill_value='extrapolate')
+                                     np.log10(Ppar['profile']), kind='linear', fill_value='extrapolate')
             pr0 = 10**f(np.log10(r0.to_value('kpc')))
             
             Ppar['profile'] = Ppar['profile']/pr0*Bnorm
@@ -988,7 +988,7 @@ class Modpar(object):
             Ppar['profile'] = (Ppar['profile'].to_value('cm-3'))**scal
 
             f = interpolate.interp1d(np.log10(Ppar['radius'].to_value('kpc')),
-                                     np.log10(Ppar['profile']), kind='quadratic', fill_value='extrapolate')
+                                     np.log10(Ppar['profile']), kind='linear', fill_value='extrapolate')
             pr0 = 10**f(np.log10(r0.to_value('kpc')))
 
             Ppar['profile'] = Ppar['profile']/pr0*Bnorm
@@ -1108,11 +1108,11 @@ class Modpar(object):
             # Interpolation (log-log works well, but r-log(p) works better for derivatives)
             if derivative:
                 f = interpolate.interp1d(user_r,
-                                         np.log10(user_p), kind='quadratic', fill_value='extrapolate')
+                                         np.log10(user_p), kind='linear', fill_value='extrapolate')
                 pitpl_r = 10**f(r3d_kpc)
             else:
                 f = interpolate.interp1d(np.log10(user_r),
-                                         np.log10(user_p), kind='quadratic', fill_value='extrapolate')
+                                         np.log10(user_p), kind='linear', fill_value='extrapolate')
                 pitpl_r = 10**f(np.log10(r3d_kpc))
                 
             if np.amin(user_r) > np.amin(r3d_kpc) or np.amax(user_r) < np.amax(r3d_kpc): 
