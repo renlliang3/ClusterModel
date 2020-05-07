@@ -921,8 +921,9 @@ class Modpar(object):
             
             Ppar['profile'] = Ppar['profile']/pr0*Bnorm
             
-            if np.amin(Ppar['radius'].to_value('kpc')) > r0.to_value('kpc') or np.amax(Ppar['radius'].to_value('kpc')) < r0.to_value('kpc'): 
-                print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
+            if np.amin(Ppar['radius'].to_value('kpc')) > r0.to_value('kpc') or np.amax(Ppar['radius'].to_value('kpc')) < r0.to_value('kpc'):
+                if self._silent == False:
+                    print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
                 
         else:
             raise ValueError('Problem with density model list.')
@@ -993,8 +994,9 @@ class Modpar(object):
 
             Ppar['profile'] = Ppar['profile']/pr0*Bnorm
             
-            if np.amin(Ppar['radius'].to_value('kpc')) > r0.to_value('kpc') or np.amax(Ppar['radius'].to_value('kpc')) < r0.to_value('kpc'): 
-                print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
+            if np.amin(Ppar['radius'].to_value('kpc')) > r0.to_value('kpc') or np.amax(Ppar['radius'].to_value('kpc')) < r0.to_value('kpc'):
+                if self._silent == False:
+                    print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
 
         else:
             raise ValueError('Problem with density model list.')
@@ -1115,8 +1117,9 @@ class Modpar(object):
                                          np.log10(user_p), kind='linear', fill_value='extrapolate')
                 pitpl_r = 10**f(np.log10(r3d_kpc))
                 
-            if np.amin(user_r) > np.amin(r3d_kpc) or np.amax(user_r) < np.amax(r3d_kpc): 
-                print('WARNING: User model interpolated beyond the provided range!')
+            if np.amin(user_r) > np.amin(r3d_kpc) or np.amax(user_r) < np.amax(r3d_kpc):
+                if self._silent == False:
+                    print('WARNING: User model interpolated beyond the provided range!')
 
             # Correct for negative value
             pitpl_r[pitpl_r<0] = 0
@@ -1204,8 +1207,9 @@ class Modpar(object):
                                      np.log10(user_s), kind='linear', fill_value='extrapolate')
             sitpl_e = 10**f(np.log10(eng_GeV))
 
-            if np.amin(user_e) > np.amin(eng_GeV) or np.amax(user_e) < np.amax(eng_GeV): 
-                print('WARNING: User model interpolated beyond the provided range!')
+            if np.amin(user_e) > np.amin(eng_GeV) or np.amax(user_e) < np.amax(eng_GeV):
+                if self._silent == False:
+                    print('WARNING: User model interpolated beyond the provided range!')
 
             # Correct for negative value
             sitpl_e[sitpl_e<0] = 0
