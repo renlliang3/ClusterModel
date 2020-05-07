@@ -42,6 +42,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
 
     To do
     -----
+    - Implement all functions in automatic plots
     - Make sure Epmin and Eemin are fine wrt integration of distribution
     - Check the effect of E{e/p}min on gamma ray interaction (i.e. v~c approx)
         
