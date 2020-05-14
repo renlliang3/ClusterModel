@@ -76,7 +76,8 @@ class Observables(object):
                            Rmin=None, Rmax=None,
                            type_integral='spherical',
                            Rmin_los=None, NR500_los=5.0,
-                           Cframe=False):
+                           Cframe=False,
+                           model='Kafexhiu2014'):
         """
         Compute the gamma ray emission enclosed within [Rmin,Rmax], in 3d (i.e. spherically 
         integrated), or the gamma ray emmission enclosed within an circular area (i.e.
@@ -93,6 +94,7 @@ class Observables(object):
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         This is used only for cylindrical case
         - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
 
         Outputs
         ----------
@@ -126,7 +128,7 @@ class Observables(object):
         # Compute the integral
         if type_integral == 'spherical':
             rad = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma(energy_rf, rad)
+            dN_dEdVdt = self.get_rate_gamma(energy_rf, rad, model=model)
             dN_dEdt = model_tools.spherical_integration(dN_dEdVdt, rad)
             
         # Compute the integral        
@@ -136,7 +138,7 @@ class Observables(object):
             r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
             r2d = model_tools.sampling_array(Rmin, Rmax, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma(energy_rf, r3d)
+            dN_dEdVdt = self.get_rate_gamma(energy_rf, r3d, model=model)
             dN_dEdt = model_tools.cylindrical_integration(dN_dEdVdt, energy, r3d, r2d, los, Rtrunc=self._R_truncation)
         
         # From intrinsic luminosity to flux
@@ -157,7 +159,8 @@ class Observables(object):
     def get_gamma_profile(self, radius=np.logspace(0,4,100)*u.kpc,
                           Emin=None, Emax=None, Energy_density=False,
                           Rmin_los=None, NR500_los=5.0,
-                          Cframe=False):
+                          Cframe=False,
+                          model='Kafexhiu2014'):
         """
         Compute the gamma ray emission profile within Emin-Emax.
         
@@ -171,6 +174,7 @@ class Observables(object):
         - Rmin_los (quantity): minimal radius at which l.o.s integration starts
         - NR500_los (float): the line-of-sight integration will stop at NR500_los x R500. 
         - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
 
         Outputs
         ----------
@@ -203,7 +207,7 @@ class Observables(object):
         Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-        dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d)
+        dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d, model=model)
 
         # Apply EBL absorbtion
         if self._EBL_model != 'none' and not Cframe:
@@ -240,7 +244,8 @@ class Observables(object):
                        Rmin=None, Rmax=None,
                        type_integral='spherical',
                        Rmin_los=None, NR500_los=5.0,
-                       Cframe=False):
+                       Cframe=False,
+                       model='Kafexhiu2014'):
         
         """
         Compute the gamma ray emission enclosed within Rmax, in 3d (i.e. spherically 
@@ -298,7 +303,8 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(Emin, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los,
+                                                        Cframe=Cframe, model=model)
 
             # Integrate over it and return
             flux = model_tools.energy_integration(dN_dEdSdt, energy, Energy_density=Energy_density)
@@ -308,7 +314,8 @@ class Observables(object):
             # Get a spectrum
             energy = model_tools.sampling_array(np.amin(Emin.value)*Emin.unit, Emax, NptPd=self._Npt_per_decade_integ, unit=True)
             energy, dN_dEdSdt = self.get_gamma_spectrum(energy, Rmin=Rmin, Rmax=Rmax,
-                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
+                                                        type_integral=type_integral, Rmin_los=Rmin_los, NR500_los=NR500_los,
+                                                        Cframe=Cframe, model=model)
 
             # Integrate over it and return
             if Energy_density:
@@ -341,7 +348,7 @@ class Observables(object):
                 Rmin3d = np.sqrt(Rmin_los**2 + Rmin**2)*0.9
             r3d = model_tools.sampling_array(Rmin3d, Rmax3d, NptPd=self._Npt_per_decade_integ, unit=True)
             los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
-            dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d)
+            dN_dEdVdt = self.get_rate_gamma(eng_rf, r3d, model=model)
 
             # Apply EBL absorbtion
             if self._EBL_model != 'none' and not Cframe:
@@ -398,7 +405,8 @@ class Observables(object):
                       Rmin_los=None, NR500_los=5.0,
                       Rmin=None, Rmax=None,
                       Energy_density=False, Normalize=False,
-                      Cframe=False):
+                      Cframe=False,
+                      model='Kafexhiu2014'):
         """
         Compute the gamma ray map. The map is normalized so that the integral 
         of the map over the cluster volume is 1 (up to Rmax=5R500).
@@ -420,6 +428,7 @@ class Observables(object):
         - Normalize (bool): if True, the map is normalized by the flux to get a 
         template in unit of sr-1 
         - Cframe (bool): computation assumes that we are in the cluster frame (no redshift effect)
+        - model (str): change the reference model to 'Kafexhiu2014' or 'Kelner2006'
 
         Outputs
         ----------
@@ -448,7 +457,7 @@ class Observables(object):
         
         # Project the integrand
         r_proj, profile = self.get_gamma_profile(radius, Emin=Emin, Emax=Emax, Energy_density=Energy_density,
-                                                 Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe)
+                                                 Rmin_los=Rmin_los, NR500_los=NR500_los, Cframe=Cframe, model=model)
 
         # Convert to angle and interpolate onto a map
         theta_proj = (r_proj/self._D_ang).to_value('')*180.0/np.pi   # degrees
