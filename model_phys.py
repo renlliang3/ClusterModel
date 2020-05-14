@@ -693,7 +693,9 @@ class Physics(object):
         radius, B   = self.get_magfield_profile(radius)
         
         # Get the losses
-        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift)
+        mu_gas,mu_e,mu_p,mu_alpha = cluster_global.mean_molecular_weight(Y=self._helium_mass_fraction,
+                                                                         Z=self._metallicity_sol*self._abundance)
+        dEdt = cluster_electron_loss.dEdt_tot(energy, radius=radius, n_e=n_e, B=B, redshift=self._redshift, ne2nth=mu_e/mu_p+mu_e/mu_alpha)
 
         # Compute the integral \int_E^\infty Q(E) dE
         dN_dEdVdt_integrated = np.zeros((len(energy),len(radius)))* dN_dEdVdt.unit*eng.unit

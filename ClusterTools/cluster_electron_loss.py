@@ -112,32 +112,32 @@ def dEdt_coul(energy, n_e):
     
     return dEdt.to('GeV s-1')
 
+
 #===================================================
 #========== Bremsstrahlung loss
 #===================================================
-def dEdt_brem(energy, n_e):
+def dEdt_brem(energy, n_e, ne2nth=1.071):
     """
-    Compute loss Bremsstrahlung from Sarazin (1999)
+    Compute loss Bremsstrahlung from Blumenthal & Gould 1970
 
     Parameters
     ----------
     - energy (quantity): energy array homogeneous to GeV
     - n_e (quantity): the number density of ambient electrons
+    - ne2nth (float): corresponds to conversion from n_e to n_th, being
+    equal to mu_e/mu_p + mu_e/mu_He
 
     Outputs
     --------
     - Energy loss (GeV/s)
     """
-    
+
+    alpha = ((const.e.value*const.e.unit)**2 / (4*np.pi*const.eps0*const.hbar*const.c)).to_value('')
+    r0 = (const.e.value*const.e.unit)**2 / (const.m_e*const.c**2) / (4*np.pi*const.eps0)
     gamma = (energy/(const.m_e*const.c**2)).to('')
     w_neg = gamma <= 1
     gamma[w_neg] = 2 # set negative values to 2, and will set result to 0 there
-
-    dgdt = 1.51e-16 * n_e.to_value('cm-3')*gamma*(np.log(gamma)+0.36)*u.s**-1
-    dEdt = dgdt * const.m_e*const.c**2
-
-    # Energy cannot be lower than rest mass
-    dEdt[w_neg] = 0
+    dEdt = 8*alpha*r0**2*energy*const.c* ne2nth*n_e * (np.log(2*gamma) - 1.0/3)
     
     return dEdt.to('GeV s-1')
 
@@ -145,7 +145,7 @@ def dEdt_brem(energy, n_e):
 #===================================================
 #========== Total losses
 #===================================================
-def dEdt_tot(energy, radius=None, n_e=1*u.cm**-3, B=1*u.uG, redshift=0.0):
+def dEdt_tot(energy, radius=None, n_e=1*u.cm**-3, B=1*u.uG, redshift=0.0, ne2nth=1.071):
     """
     Compute loss from brem + Coul + IC + Sync
 
@@ -157,6 +157,8 @@ def dEdt_tot(energy, radius=None, n_e=1*u.cm**-3, B=1*u.uG, redshift=0.0):
     - n_e (quantity): the number density of ambient electrons
     - B (quantity): magnetic field strength homogeneous to Gauss
     - redshift (float): cluster redshift
+    - ne2nth (float): corresponds to conversion from n_e to n_th, being
+    equal to mu_e/mu_p + mu_e/mu_He
 
     Outputs
     --------
@@ -179,7 +181,7 @@ def dEdt_tot(energy, radius=None, n_e=1*u.cm**-3, B=1*u.uG, redshift=0.0):
     #========== Compute
     dEdt1 = dEdt_sync(e_grid, B_grid)
     dEdt2 = dEdt_ic(e_grid, redshift)
-    dEdt3 = dEdt_brem(e_grid, n_grid)
+    dEdt3 = dEdt_brem(e_grid, n_grid, ne2nth=ne2nth)
     dEdt4 = dEdt_coul(e_grid, n_grid)
 
     dEdt = dEdt1 + dEdt2 + dEdt3 + dEdt4    
