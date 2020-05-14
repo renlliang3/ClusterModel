@@ -796,7 +796,7 @@ class Modpar(object):
                 # In this case we have p = p1+p2 -> (p1+p2)^scal, so scal cannot be applied to individual profile
                 raise ValueError('Transformation not available with doublebeta model for scal != 1.')
 
-        elif self._pressure_gas_model['name'] == 'User':
+        elif self._density_gas_model['name'] == 'User':
             Ppar['profile'] = (Ppar['profile'].to_value('cm-3'))**scal * u.adu
              
         else:
@@ -849,7 +849,7 @@ class Modpar(object):
                 # In this case we have p = p1+p2 -> (p1+p2)^scal, so scal cannot be applied to individual profile
                 raise ValueError('Transformation not available with doublebeta model for scal != 1.')
 
-        elif self._pressure_gas_model['name'] == 'User':
+        elif self._density_gas_model['name'] == 'User':
             Ppar['profile'] = (Ppar['profile'].to_value('cm-3'))**scal * u.adu
             
         else:
@@ -926,6 +926,7 @@ class Modpar(object):
                     print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
                 
         else:
+            print('Model is '+self._pressure_gas_model['name'])
             raise ValueError('Problem with density model list.')
 
         self._magfield_model = Ppar
@@ -985,7 +986,7 @@ class Modpar(object):
                 # In this case we have p = p1+p2 -> (p1+p2)^scal, so scal cannot be applied to individual profile
                 raise ValueError('Transformation not available with doublebeta model for scal != 1.')
 
-        elif self._pressure_gas_model['name'] == 'User':
+        elif self._density_gas_model['name'] == 'User':
             Ppar['profile'] = (Ppar['profile'].to_value('cm-3'))**scal
 
             f = interpolate.interp1d(np.log10(Ppar['radius'].to_value('kpc')),
@@ -999,6 +1000,7 @@ class Modpar(object):
                     print('WARNING: User model interpolated beyond available range to get normalisation radius r0!')
 
         else:
+            print('Model is '+self._density_gas_model['name'])
             raise ValueError('Problem with density model list.')
 
         self._magfield_model = Ppar
