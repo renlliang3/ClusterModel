@@ -259,7 +259,8 @@ class Plots(object):
              Eemin=None, Eemax=None,
              freq0=1*u.GHz,
              Rmax=None,
-             Egmin=None, Egmax=None):
+             Egmin=None, Egmax=None,
+             directory=None):
         
         """
         Main function of the sub-module of the cluster class dedicated to plots.
@@ -279,6 +280,8 @@ class Plots(object):
         - Egmax (quantity): the upper bound for energy gamma integration
         - Rmax (quantity): the radius within with the spectrum is computed 
         (default is R500)
+        - directory (str): full path to a directory where to produce plots. 
+        Default will be self.output_dir
         
         """
 
@@ -298,11 +301,12 @@ class Plots(object):
         if Egmax is None:
             Egmax = self._Epmax
 
-        # Create directory
-        if not os.path.exists(self._output_dir): os.mkdir(self._output_dir)
-
-        # get directory
-        outdir = self._output_dir
+        # Directory
+        if directory is not None:
+            mydir = directory
+        else:
+            mydir = self._output_dir
+        if not os.path.exists(mydir): os.mkdir(mydir)
 
         # plot parameters
         set_default_plot_param()
@@ -315,145 +319,152 @@ class Plots(object):
 
             # Pressure
             rad, prof = self.get_pressure_gas_profile(radius)
-            profile(radius, angle, prof.to('keV cm-3'), self._output_dir+'/PLOT_PROF_gas_pressure.pdf',
+            profile(radius, angle, prof.to('keV cm-3'), mydir+'/PLOT_PROF_gas_pressure.pdf',
                     label='Electron pressure (keV cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gas pressure')
 
             # Density
             rad, prof = self.get_density_gas_profile(radius)
-            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_gas_density.pdf',
+            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_gas_density.pdf',
                     label='Electron density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gas density')
 
             # temperature
             rad, prof = self.get_temperature_gas_profile(radius)
-            profile(radius, angle, prof.to('keV'), self._output_dir+'/PLOT_PROF_gas_temperature.pdf',
+            profile(radius, angle, prof.to('keV'), mydir+'/PLOT_PROF_gas_temperature.pdf',
                     label='Gas temperature (keV)', R500=self._R500)
             if not self._silent: print('----- Plot done: gas temperature')
 
             # Entropy
             rad, prof = self.get_entropy_gas_profile(radius)
-            profile(radius, angle, prof.to('keV cm2'), self._output_dir+'/PLOT_PROF_gas_entropy.pdf',
+            profile(radius, angle, prof.to('keV cm2'), mydir+'/PLOT_PROF_gas_entropy.pdf',
                     label='Gas entropy (keV cm$^2$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gas entropy')
 
             # Masse HSE
             rad, prof = self.get_hse_mass_profile(radius)
-            profile(radius, angle, prof.to('Msun'), self._output_dir+'/PLOT_PROF_hse_mass.pdf',
+            profile(radius, angle, prof.to('Msun'), mydir+'/PLOT_PROF_hse_mass.pdf',
                     label='HSE mass (M$_{\\odot}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: HSE mass')
 
             # Overdensity
             rad, prof = self.get_overdensity_contrast_profile(radius)
-            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_overdensity.pdf',
+            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_overdensity.pdf',
                     label='Overdensity $\\rho / \\rho_{c}$', R500=self._R500)
             if not self._silent: print('----- Plot done: density contrast')
 
             # Gas mass
             rad, prof = self.get_gas_mass_profile(radius)
-            profile(radius, angle, prof.to('Msun'), self._output_dir+'/PLOT_PROF_gas_mass.pdf',
+            profile(radius, angle, prof.to('Msun'), mydir+'/PLOT_PROF_gas_mass.pdf',
                     label='Gas mass (M$_{\\odot}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gas mass')
 
             # fgas profile
             rad, prof = self.get_fgas_profile(radius)
-            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_gas_fraction.pdf',
+            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_gas_fraction.pdf',
                     label='Gas fraction', R500=self._R500)
             if not self._silent: print('----- Plot done: gas fraction')
 
             # Thermal energy
             rad, prof = self.get_thermal_energy_profile(radius)
-            profile(radius, angle, prof.to('erg'), self._output_dir+'/PLOT_PROF_gas_thermal_energy.pdf',
+            profile(radius, angle, prof.to('erg'), mydir+'/PLOT_PROF_gas_thermal_energy.pdf',
                     label='Thermal energy (erg)', R500=self._R500)
             if not self._silent: print('----- Plot done: thermal energy')
 
             # Magfield
             rad, prof = self.get_magfield_profile(radius)
-            profile(radius, angle, prof.to('uG'), self._output_dir+'/PLOT_PROF_magnetic_field.pdf',
+            profile(radius, angle, prof.to('uG'), mydir+'/PLOT_PROF_magnetic_field.pdf',
                     label='Magnetic field ($\\mu$G)', R500=self._R500)
             if not self._silent: print('----- Plot done: magnetic field')
             
             # Cosmic ray proton
             rad, prof = self.get_density_crp_profile(radius, Emin=Epmin, Emax=Epmax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_crp_density.pdf',
+            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_crp_density.pdf',
                     label='CRp density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: CRp density')
                         
             # Cosmic ray proton to thermal energy
             rad, prof = self.get_crp_to_thermal_energy_profile(radius, Emin=Epmin, Emax=Epmax)
-            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_crp_fraction.pdf',
+            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_crp_fraction.pdf',
                     label='CRp to thermal energy $X_{CRp}$', R500=self._R500)
             if not self._silent: print('----- Plot done: CRp/thermal energy')
 
             # Cosmic ray electrons secondaries
             rad, prof = self.get_density_cre2_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_cre2_density.pdf',
+            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre2_density.pdf',
                     label='CRe2 density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: CRe2 density')
 
             # Cosmic ray electrons primaries
             rad, prof = self.get_density_cre1_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-3'), self._output_dir+'/PLOT_PROF_cre1_density.pdf',
+            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre1_density.pdf',
                     label='CRe1 density (cm$^{-3}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: CRe1 density')
+
+            # Cosmic ray electron to thermal energy
+            rad, prof = self.get_cre1_to_thermal_energy_profile(radius, Emin=Eemin, Emax=Eemax)
+            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_cre1_fraction.pdf',
+                    label='CRe1 to thermal energy $X_{CRe1}$', R500=self._R500)
+            if not self._silent: print('----- Plot done: CRe1/thermal energy')
             
             # Gamma ray profile
             rad, prof = self.get_gamma_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), self._output_dir+'/PLOT_PROF_gamma.pdf',
+            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), mydir+'/PLOT_PROF_gamma.pdf',
                     label='$\\gamma$-ray, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gamma surface brightness profile')
 
             # Gamma ray integrated flux profile
             prof = self.get_gamma_flux(Emin=Egmin, Emax=Egmax, Rmax=radius, Energy_density=False, type_integral='spherical')
-            profile(radius, angle, prof.to('cm-2 s-1'), self._output_dir+'/PLOT_PROF_gammaF.pdf',
+            profile(radius, angle, prof.to('cm-2 s-1'), mydir+'/PLOT_PROF_gammaF.pdf',
                     label='$\\gamma$-ray flux (<R, sph), '+Egstrlim+' (cm$^{-2}$ s$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: gamma integrated (R) flux')
 
             # neutrino profile
             rad, prof = self.get_neutrino_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False, flavor='all')
-            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), self._output_dir+'/PLOT_PROF_neutrino.pdf',
+            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), mydir+'/PLOT_PROF_neutrino.pdf',
                     label='$\\nu$, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: neutrino surface brightness profile')
 
             # neutrino integrated flux profile
-            prof = self.get_neutrino_flux(Emin=Egmin, Emax=Egmax, Rmax=radius, Energy_density=False, type_integral='spherical', flavor='all')
-            profile(radius, angle, prof.to('cm-2 s-1'), self._output_dir+'/PLOT_PROF_neutrinoF.pdf',
+            prof = self.get_neutrino_flux(Emin=Egmin, Emax=Egmax, Rmax=radius, Energy_density=False,
+                                          type_integral='spherical', flavor='all')
+            profile(radius, angle, prof.to('cm-2 s-1'), mydir+'/PLOT_PROF_neutrinoF.pdf',
                     label='$\\nu$ flux (<R, sph), '+Egstrlim+' (cm$^{-2}$ s$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: neutrino integrated (R) flux')
 
             # IC profile
             rad, prof = self.get_ic_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), self._output_dir+'/PLOT_PROF_InverseCompton.pdf',
+            profile(radius, angle, prof.to('cm-2 s-1 sr-1'), mydir+'/PLOT_PROF_InverseCompton.pdf',
                     label='IC, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: IC surface brightness profile')
 
             # IC integrated flux profile
             prof = self.get_ic_flux(Emin=Egmin, Emax=Egmax, Rmax=radius, Energy_density=False, type_integral='spherical')
-            profile(radius, angle, prof.to('cm-2 s-1'), self._output_dir+'/PLOT_PROF_InverseComptonF.pdf',
+            profile(radius, angle, prof.to('cm-2 s-1'), mydir+'/PLOT_PROF_InverseComptonF.pdf',
                     label='IC flux (<R, sph), '+Egstrlim+' (cm$^{-2}$ s$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: IC integrated (R) flux')
 
             # Synchrotron profile
             rad, prof = self.get_synchrotron_profile(radius, freq0=freq0)
-            profile(radius, angle, prof.to('Jy sr-1'), self._output_dir+'/PLOT_PROF_synchrotron.pdf',
+            profile(radius, angle, prof.to('Jy sr-1'), mydir+'/PLOT_PROF_synchrotron.pdf',
                     label='Synchrotron, '+str(freq0)+' (Jy sr$^{-1}$)', R500=self._R500)
             if not self._silent: print('----- Plot done: Synchrotron surface brightness profile')
 
             # Synchrotron integrated flux profile
             prof = self.get_synchrotron_flux(freq0=freq0, Rmax=radius, type_integral='spherical')
-            profile(radius, angle, prof.to('Jy'), self._output_dir+'/PLOT_PROF_synchrotronF.pdf',
+            profile(radius, angle, prof.to('Jy'), mydir+'/PLOT_PROF_synchrotronF.pdf',
                     label='Synchrotron flux (<R, sph), '+str(freq0)+' (Jy)', R500=self._R500)
             if not self._silent: print('----- Plot done: Synchrotron integrated (R) flux')
 
             # Compton parameter
             rad, prof = self.get_sz_profile(radius, Compton_only=True)
-            profile(radius, angle, prof.to('adu'), self._output_dir+'/PLOT_PROF_SZ.pdf',
+            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_SZ.pdf',
                     label='y Compton', R500=self._R500)
             if not self._silent: print('----- Plot done: SZ Compton')
             
             # Spherically integrated Compton
             prof = self.get_sz_flux(Rmax=radius, Compton_only=True, type_integral='spherical')
-            profile(radius, angle, prof.to('kpc2'), self._output_dir+'/PLOT_PROF_SZF.pdf',
+            profile(radius, angle, prof.to('kpc2'), mydir+'/PLOT_PROF_SZF.pdf',
                     label='Y spherical (kpc$^2$)', R500=self._R500)
             if not self._silent: print('----- Plot done: SZ integrated Compton (spherical)')
 
@@ -461,13 +472,13 @@ class Plots(object):
 
                 # Sx profile
                 rad, prof = self.get_xray_profile(radius, output_type='C')
-                profile(radius, angle, prof.to('s-1 cm-2 sr-1'), self._output_dir+'/PLOT_PROF_X.pdf',
+                profile(radius, angle, prof.to('s-1 cm-2 sr-1'), mydir+'/PLOT_PROF_X.pdf',
                         label='X-ray (s$^{-1}$ cm$^{-2}$ sr$^{-1}$)', R500=self._R500)
                 if not self._silent: print('----- Plot done: Xray surface brightness')
 
                 # Spherically integrated Xray flux
                 prof = self.get_xray_flux(Rmax=radius, type_integral='spherical', output_type='C')
-                profile(radius, angle, prof.to('s-1 cm-2'), self._output_dir+'/PLOT_PROF_XF.pdf',
+                profile(radius, angle, prof.to('s-1 cm-2'), mydir+'/PLOT_PROF_XF.pdf',
                         label='$F_X$ spherical (s$^{-1}$ cm$^{-2}$)', R500=self._R500)
                 if not self._silent: print('----- Plot done: Xray integrated flux (spherical)')
                                 
@@ -479,75 +490,75 @@ class Plots(object):
             # CR protons
             eng, spec = self.get_crp_spectrum(energy, Rmax=Rmax)
             spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    self._output_dir+'/PLOT_SPEC_CRp.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
+                    mydir+'/PLOT_SPEC_CRp.pdf', label='Volume integrated CRp (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRp spectrum')
 
             # CR electrons secondaries
             eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
             spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    self._output_dir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe2 (GeV$^{-1}$)')
+                    mydir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe2 (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRe2 spectrum')
 
             # CR electrons primaries
             eng, spec = self.get_cre1_spectrum(energy, Rmax=Rmax)
             spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    self._output_dir+'/PLOT_SPEC_CRe1.pdf', label='Volume integrated CRe1 (GeV$^{-1}$)')
+                    mydir+'/PLOT_SPEC_CRe1.pdf', label='Volume integrated CRe1 (GeV$^{-1}$)')
             if not self._silent: print('----- Plot done: CRe1 spectrum')
             
             # gamma
             eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical')
             spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
-                    self._output_dir+'/PLOT_SPEC_gamma.pdf',
+                    mydir+'/PLOT_SPEC_gamma.pdf',
                     label='$F_{\\gamma}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: gamma spectrum')
 
             # Gamma integrated flux spectrum
             spec = self.get_gamma_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical')
             spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'),
-                    self._output_dir+'/PLOT_SPEC_gammaF.pdf', label='$\\gamma$-ray flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
+                    mydir+'/PLOT_SPEC_gammaF.pdf', label='$\\gamma$-ray flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: gamma integrated flux (E)')
 
             # neutrino
             eng, spec = self.get_neutrino_spectrum(energy, Rmax=Rmax, type_integral='spherical', flavor='all')
             spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
-                    self._output_dir+'/PLOT_SPEC_neutrino.pdf', label='$F_{\\nu}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
+                    mydir+'/PLOT_SPEC_neutrino.pdf', label='$F_{\\nu}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: neutrino spectrum')
             
             # neutrino integrated flux spectrum
             spec = self.get_neutrino_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical',
                                           flavor='all')
             spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'),
-                    self._output_dir+'/PLOT_SPEC_neutrinoF.pdf',label='$\\nu$ flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
+                    mydir+'/PLOT_SPEC_neutrinoF.pdf',label='$\\nu$ flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: neutrino integrated flux (E)')
 
             # IC
             eng, spec = self.get_ic_spectrum(energy, Rmax=Rmax, type_integral='spherical')
             spectra(energy, (energy/const.h).to('GHz'), (energy**2*spec).to('GeV cm-2 s-1'),
-                    self._output_dir+'/PLOT_SPEC_InverseCompton.pdf',label='$F_{IC}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
+                    mydir+'/PLOT_SPEC_InverseCompton.pdf',label='$F_{IC}$(<R, sph) (GeV cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: IC spectrum')
 
             # IC integrated flux spectrum
             spec = self.get_ic_flux(Emin=energy, Emax=Egmax, Rmax=Rmax, Energy_density=False, type_integral='spherical')
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'), self._output_dir+'/PLOT_SPEC_InverseComptonF.pdf',
+            spectra(energy, (energy/const.h).to('GHz'), spec.to('cm-2 s-1'), mydir+'/PLOT_SPEC_InverseComptonF.pdf',
                     label='IC flux (>E, sph) (cm$^{-2}$ s$^{-1}$)')
             if not self._silent: print('----- Plot done: IC integrated flux (E)')
 
             # Synchrotron
             freq, spec = self.get_synchrotron_spectrum(frequency, Rmax=Rmax, type_integral='spherical')
-            spectra((freq*const.h).to('eV'), freq, spec.to('Jy'), self._output_dir+'/PLOT_SPEC_Synchrotron.pdf',
+            spectra((freq*const.h).to('eV'), freq, spec.to('Jy'), mydir+'/PLOT_SPEC_Synchrotron.pdf',
                     label='$F_{synch}$(<R, sph) (Jy)')
             if not self._silent: print('----- Plot done: Synchrotron spectrum')
             
             # SZ
             freq, spec = self.get_sz_spectrum(frequency, Rmax=Rmax, type_integral='spherical', Compton_only=False)
-            spectra((freq*const.h).to('eV'), freq, np.abs(spec.to('Jy')), self._output_dir+'/PLOT_SPEC_SZ.pdf',
+            spectra((freq*const.h).to('eV'), freq, np.abs(spec.to('Jy')), mydir+'/PLOT_SPEC_SZ.pdf',
                     label='$|F_{SZ}|$(<R, sph) (Jy)')
             if not self._silent: print('----- Plot done: SZ spectrum')
 
             # Xray
-            if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
+            if os.path.exists(mydir+'/XSPEC_table.txt'):
                 engX, spec = self.get_xray_spectrum(energyX, Rmax=Rmax, type_integral='spherical', output_type='C')
-                spectra(engX.to('keV'), (engX/const.h).to('GHz'), spec.to('cm-2 s-1 keV-1'), self._output_dir+'/PLOT_SPEC_X.pdf',
+                spectra(engX.to('keV'), (engX/const.h).to('GHz'), spec.to('cm-2 s-1 keV-1'), mydir+'/PLOT_SPEC_X.pdf',
                         label='$S_{X}$(<R, sph) (cm$^{-2}$ s$^{-1}$ keV${-1}$)')
                 if not self._silent: print('----- Plot done: Xray spectrum')
             else:
@@ -558,32 +569,35 @@ class Plots(object):
             header = self.get_map_header()
 
             # gamma    
-            image = self.get_gamma_map(Emin=Egmin, Emax=Egmax, Energy_density=False, Normalize=False).to_value('cm-2 s-1 sr-1')
-            maps(image, header, self._output_dir+'/PLOT_MAP_gamma.pdf', label='$\\gamma$-ray, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
+            image = self.get_gamma_map(Emin=Egmin, Emax=Egmax, Energy_density=False,
+                                       Normalize=False).to_value('cm-2 s-1 sr-1')
+            maps(image, header, mydir+'/PLOT_MAP_gamma.pdf',
+                 label='$\\gamma$-ray, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
                  coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
             if not self._silent: print('----- Plot done: gamma map')
 
             # neutrino    
-            image = self.get_neutrino_map(Emin=Egmin, Emax=Egmax, Energy_density=False, Normalize=False, flavor='all').to_value('cm-2 s-1 sr-1')
-            maps(image, header, self._output_dir+'/PLOT_MAP_neutrino.pdf', label='$\\nu$, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
+            image = self.get_neutrino_map(Emin=Egmin, Emax=Egmax, Energy_density=False,
+                                          Normalize=False, flavor='all').to_value('cm-2 s-1 sr-1')
+            maps(image, header, mydir+'/PLOT_MAP_neutrino.pdf', label='$\\nu$, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
                  coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
             if not self._silent: print('----- Plot done: neutrino map')
 
             # IC    
             image = self.get_ic_map(Emin=Egmin, Emax=Egmax, Energy_density=False, Normalize=False).to_value('cm-2 s-1 sr-1')
-            maps(image, header, self._output_dir+'/PLOT_MAP_inverseCompton.pdf', label='IC, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
+            maps(image, header, mydir+'/PLOT_MAP_inverseCompton.pdf', label='IC, '+Egstrlim+' (cm$^{-2}$ s$^{-1}$ sr$^{-1}$)',
                  coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
             if not self._silent: print('----- Plot done: IC map')
 
             # Synchrotron
             image = self.get_synchrotron_map(freq0=freq0, Normalize=False).to_value('Jy sr-1')
-            maps(image, header, self._output_dir+'/PLOT_MAP_synchrotron.pdf', label='Synchrotron, '+str(freq0)+' (Jy sr$^{-1}$)',
+            maps(image, header, mydir+'/PLOT_MAP_synchrotron.pdf', label='Synchrotron, '+str(freq0)+' (Jy sr$^{-1}$)',
                  coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
             if not self._silent: print('----- Plot done: Synchrotron map')
 
             # SZ ymap
             image = self.get_sz_map(Compton_only=True, Normalize=False).to_value('adu')
-            maps(image*1e6, header, self._output_dir+'/PLOT_MAP_SZy.pdf',
+            maps(image*1e6, header, mydir+'/PLOT_MAP_SZy.pdf',
                  label='Compton parameter $\\times 10^{6}$', coord=self._coord, theta_500=self._theta500,
                  theta_trunc=self._theta_truncation, logscale=True)
             if not self._silent: print('----- Plot done: SZ ymap')
@@ -592,7 +606,7 @@ class Plots(object):
             if os.path.exists(self._output_dir+'/XSPEC_table.txt'):
                 
                 image = self.get_xray_map(output_type='C').to_value('s-1 cm-2 sr-1')
-                maps(image, header, self._output_dir+'/PLOT_MAP_X.pdf', label='X-ray (s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
+                maps(image, header, mydir+'/PLOT_MAP_X.pdf', label='X-ray (s$^{-1}$ cm$^{-2}$ sr$^{-1}$)',
                      coord=self._coord, theta_500=self._theta500, theta_trunc=self._theta_truncation, logscale=True)
                 if not self._silent: print('----- Plot done: Xray map')
                 

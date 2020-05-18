@@ -858,7 +858,6 @@ class Modpar(object):
         self._density_cre1_model = Ppar
 
 
-
     #==================================================
     # Set a given CRp density to isobaric profile
     #==================================================
@@ -882,7 +881,7 @@ class Modpar(object):
         try:
             test = Bnorm.to('uG')
         except:
-            raise TypeError("Borm should be homogeneous to uG")
+            raise TypeError("Bnorm should be homogeneous to uG")
         
         # Get the density parameters
         Ppar = self._pressure_gas_model.copy()
@@ -956,7 +955,7 @@ class Modpar(object):
         try:
             test = Bnorm.to('uG')
         except:
-            raise TypeError("Borm should be homogeneous to uG")
+            raise TypeError("Bnorm should be homogeneous to uG")
         
         # Get the density parameters
         Ppar = self._density_gas_model.copy()
