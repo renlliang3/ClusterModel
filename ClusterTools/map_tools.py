@@ -8,14 +8,15 @@ import matplotlib.pyplot as plt
 import healpy
 
 #===================================================
-#========== EXTRACT AND REWRITE FITS MAP
+#========== CREATE A MAP FINE FOR TEMPLATE FITTING
 #===================================================
-def re_write_fits(in_file, out_file,
-                  no_neg=False,
-                  smooth_arcmin=0.0,
-                  rm_median=False,
-                  flag_dist_arcmin=0.0,
-                  normalize=False) :
+def map_to_gamma_template(in_file,
+                          out_file=None,
+                          no_neg=False,
+                          smooth_arcmin=0.0,
+                          rm_median=False,
+                          flag_dist_arcmin=0.0,
+                          normalize=True):
     """ 
     PURPOSE: This function extracts a map from a fits fil and modifies it 
     applying smoothing, baseline removal, flag of negative values, 
@@ -39,13 +40,12 @@ def re_write_fits(in_file, out_file,
     #---------- Data extraction
     data = fits.open(in_file)[0]
     image = data.data
-    wcs = WCS(data.header)
+    header = data.header
+    wcs = WCS(header)
     reso_x = abs(wcs.wcs.cdelt[0])
     reso_y = abs(wcs.wcs.cdelt[1])
     Npixx = image.shape[0]
     Npixy = image.shape[1]
-    fov_x = Npixx * reso_x
-    fov_y = Npixy * reso_y
     
     #---------- Data modification
     if smooth_arcmin >= 0:
@@ -59,35 +59,21 @@ def re_write_fits(in_file, out_file,
         image[image < 0] = 0.0
 
     if flag_dist_arcmin > 0:
-        if Npixx/2.0 != int(Npixx/2.0): axisx = np.arange(-(Npixx-1.0)//2.0, ((Npixx-1.0)//2.0)+1.0)
-        else: axisx = np.arange(-(Npixx-1.0)//2.0, ((Npixx-1.0)//2.0)+1.0) + 0.5
-        if Npixy/2.0 != int(Npixy/2.0): axisy = np.arange(-(Npixy-1.0)//2.0, ((Npixy-1.0)//2.0)+1.0)
-        else: axisy = np.arange(-(Npixy-1.0)//2.0, ((Npixy-1.0)//2.0)+1.0) + 0.5
-        coord_y, coord_x = np.meshgrid(axisx, axisy, indexing='ij')
-        radius_map = np.sqrt((coord_x * reso_x)**2 + (coord_y * reso_y)**2)
-        image[radius_map > flag_dist_arcmin/60.0] = 0.0
+        ra_map, dec_map = get_radec_map(data.header)
+        ra_ctr = np.mean(ra_map)
+        dec_ctr = np.mean(dec_map)
+        distmap = greatcircle(ra_map, dec_map, ra_ctr, dec_ctr)
+        image[distmap > flag_dist_arcmin/60.0] = 0.0
 
     if normalize == True:
         norm = np.sum(image) * reso_x * reso_y * (np.pi/180.0)**2
         image = image/norm
         
-    #---------- WCS construction
-    w = WCS(naxis=2)
-    w.wcs.crpix = wcs.wcs.crpix
-    w.wcs.cdelt = wcs.wcs.cdelt
-    w.wcs.crval = wcs.wcs.crval
-    w.wcs.latpole = wcs.wcs.latpole
-    w.wcs.lonpole = wcs.wcs.lonpole
-    if (wcs.wcs.ctype[0] == "RA--TAN") or (wcs.wcs.ctype[1] == "DEC-TAN"):
-        w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-    else:
-        w.wcs.ctype = wcs.wcs.ctype
-
     #---------- Write FITS
-    header = w.to_header()
-    hdu = fits.PrimaryHDU(header=header)
-    hdu.data = image
-    hdu.writeto(out_file, overwrite=True)
+    if out_file is not None:
+        hdu = fits.PrimaryHDU(header=header)
+        hdu.data = image
+        hdu.writeto(out_file, overwrite=True)
     
     return image, header
 
