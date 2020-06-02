@@ -390,22 +390,25 @@ class Plots(object):
             if not self._silent: print('----- Plot done: CRp/thermal energy')
 
             # Cosmic ray electrons secondaries
-            rad, prof = self.get_density_cre2_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre2_density.pdf',
-                    label='CRe2 density (cm$^{-3}$)', R500=self._R500)
-            if not self._silent: print('----- Plot done: CRe2 density')
+            if self._X_crep_E['X'] > 0:
+                rad, prof = self.get_density_cre2_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
+                profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre2_density.pdf',
+                        label='CRe2 density (cm$^{-3}$)', R500=self._R500)
+                if not self._silent: print('----- Plot done: CRe2 density')
 
             # Cosmic ray electrons primaries
-            rad, prof = self.get_density_cre1_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
-            profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre1_density.pdf',
-                    label='CRe1 density (cm$^{-3}$)', R500=self._R500)
-            if not self._silent: print('----- Plot done: CRe1 density')
+            if self._X_cre1_E['X'] > 0:
+                rad, prof = self.get_density_cre1_profile(radius, Emin=Eemin, Emax=Eemax, Energy_density=False)
+                profile(radius, angle, prof.to('cm-3'), mydir+'/PLOT_PROF_cre1_density.pdf',
+                        label='CRe1 density (cm$^{-3}$)', R500=self._R500)
+                if not self._silent: print('----- Plot done: CRe1 density')
 
             # Cosmic ray electron to thermal energy
-            rad, prof = self.get_cre1_to_thermal_energy_profile(radius, Emin=Eemin, Emax=Eemax)
-            profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_cre1_fraction.pdf',
-                    label='CRe1 to thermal energy $X_{CRe1}$', R500=self._R500)
-            if not self._silent: print('----- Plot done: CRe1/thermal energy')
+            if self._X_cre1_E['X'] > 0:
+                rad, prof = self.get_cre1_to_thermal_energy_profile(radius, Emin=Eemin, Emax=Eemax)
+                profile(radius, angle, prof.to('adu'), mydir+'/PLOT_PROF_cre1_fraction.pdf',
+                        label='CRe1 to thermal energy $X_{CRe1}$', R500=self._R500)
+                if not self._silent: print('----- Plot done: CRe1/thermal energy')
             
             # Gamma ray profile
             rad, prof = self.get_gamma_profile(radius, Emin=Egmin, Emax=Egmax, Energy_density=False)
@@ -494,16 +497,18 @@ class Plots(object):
             if not self._silent: print('----- Plot done: CRp spectrum')
 
             # CR electrons secondaries
-            eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    mydir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe2 (GeV$^{-1}$)')
-            if not self._silent: print('----- Plot done: CRe2 spectrum')
+            if self._X_crp_E['X'] > 0:
+                eng, spec = self.get_cre2_spectrum(energy, Rmax=Rmax)
+                spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
+                        mydir+'/PLOT_SPEC_CRe2.pdf', label='Volume integrated CRe2 (GeV$^{-1}$)')
+                if not self._silent: print('----- Plot done: CRe2 spectrum')
 
             # CR electrons primaries
-            eng, spec = self.get_cre1_spectrum(energy, Rmax=Rmax)
-            spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
-                    mydir+'/PLOT_SPEC_CRe1.pdf', label='Volume integrated CRe1 (GeV$^{-1}$)')
-            if not self._silent: print('----- Plot done: CRe1 spectrum')
+            if self._X_cre1_E['X'] > 0:
+                eng, spec = self.get_cre1_spectrum(energy, Rmax=Rmax)
+                spectra(energy, (energy/const.h).to('GHz'), spec.to('GeV-1'),
+                        mydir+'/PLOT_SPEC_CRe1.pdf', label='Volume integrated CRe1 (GeV$^{-1}$)')
+                if not self._silent: print('----- Plot done: CRe1 spectrum')
             
             # gamma
             eng, spec = self.get_gamma_spectrum(energy, Rmax=Rmax, type_integral='spherical')
