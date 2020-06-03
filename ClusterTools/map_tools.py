@@ -48,14 +48,19 @@ def map_to_gamma_template(in_file,
     Npixy = image.shape[1]
     
     #---------- Data modification
+    wnan = np.isnan(image)
+    image[wnan] = 0.0
+    winf = np.isinf(image)
+    image[winf] = 0.0
+    
     if smooth_arcmin >= 0:
         sigma_sm = smooth_arcmin/60.0/np.array([reso_x, reso_x])/(2*np.sqrt(2*np.log(2)))
         image = ndimage.gaussian_filter(image, sigma=sigma_sm)
         
-    if rm_median == True:
-        image = image - np.median(image)
+    if rm_median:
+        image = image - np.nanmedian(image)
 
-    if no_neg == True:
+    if no_neg:
         image[image < 0] = 0.0
 
     if flag_dist_arcmin > 0:
@@ -364,17 +369,18 @@ def get_healpix_dec_mask(dec_lim, nside):
 
 
 #===================================================
-#========== Compute the radial profile of a map
+#========== Compute the radial profile of a count map
 #===================================================
-def radial_profile(image, center,
-                   stddev=None,
-                   header=None,
-                   binsize=1.0,
-                   stat='GAUSSIAN',
-                   counts2brightness=False,
-                   residual=True):
+def radial_profile_cts(image, center,
+                       stddev=None,
+                       header=None,
+                       binsize=1.0,
+                       stat='GAUSSIAN',
+                       counts2brightness=False,
+                       residual=True):
     """
-    Compute the radial profile of an image
+    Compute the radial profile of an image in units proportional 
+    to counts (e.g. counts per pixel)
 
     Parameters
     ----------
@@ -390,7 +396,7 @@ def radial_profile(image, center,
     - stat (string): 'GAUSSIAN' (for surface brightness like images), 
     and 'POISSON' for counts
     - counts2brightness (bool): set to true if you want to normalized by the solid
-    angle.
+    angle. This should be set to True for surface brightness like average
     - residual (bool): is the map a residual map? If yes, the data will be taken as 
     residual+model in poisson counts 
 
@@ -427,7 +433,7 @@ def radial_profile(image, center,
         reso_y = np.abs(w.wcs.cdelt[1])
     
     dist_max = np.max(dist_map)
-    
+
     #----- Compute the binning
     Nbin = int(np.ceil(dist_max/binsize))
     r_in  = np.linspace(0, dist_max, Nbin+1)
@@ -481,6 +487,92 @@ def radial_profile(image, center,
             else:
                 val     = np.nan
                 val_err = np.nan
+
+        # Append the bin values
+        p       = np.append(p, val)
+        err     = np.append(err, val_err)
+        r_ctr   = np.append(r_ctr, (r_in[i] + r_out[i])/2.0)
+
+    return r_ctr, p, err
+
+
+#===================================================
+#========== Compute the radial profile of a count map
+#===================================================
+def radial_profile_sb(image, center,
+                      stddev=None,
+                      header=None,
+                      binsize=1.0):
+    """
+    Compute the radial profile of an image in units of brightness (e.g. Jy/sr)
+
+    Parameters
+    ----------
+    - image (2D array) : input map
+    - center (tupple) : coord along x and y. In case a header is given, these
+    are R.A. and Dec. in degrees, otherwise this is in pixel.
+    - stddev (2D array) : the standard deviation map. In case of Gaussian statistics,
+    this is the sigma of the gaussian noise distribution in each pixel. In case of 
+    Poisson statistics, we have stddev = sqrt(expected counts)
+    - header (string) : header that contains the astrometry
+    - binsize (float): the radial bin size, in degree if the header is provided and 
+    in pixel unit otherwise.
+
+    Outputs
+    --------
+    - r_ctr (1D array): the center of the radial bins
+    - p (1D array): the profile
+    - err (1D array): the uncertainty
+    
+    """
+
+    #----- Use constant weight if no stddev given
+    if stddev is None:
+        stddev = image*0+1.0
+        print('!!! WARNING: The stddev is set to 1 for each pixels.')
+        print('             stddev is the noise standard deviation in each pixel.')
+        print('             This affects the profile uncertainty and is used for weights')
+        
+    #------ Get the distance from the center map
+    if header is None:
+        y, x = np.indices((image.shape))
+        dist_map = np.sqrt((x-center[0])**2+(y-center[1])**2)  # in pixels
+        reso_x = 1.0 # pixel size in unit of pixel
+        reso_y = 1.0
+    else:
+        ra_map, dec_map = get_radec_map(header)
+        dist_map = greatcircle(ra_map, dec_map, center[0], center[1]) # in deg
+        w = WCS(header)
+        reso_x = np.abs(w.wcs.cdelt[0]) # pixel size in unit of deg
+        reso_y = np.abs(w.wcs.cdelt[1])
+    
+    dist_max = np.max(dist_map)
+
+    #----- Compute the binning
+    Nbin = int(np.ceil(dist_max/binsize))
+    r_in  = np.linspace(0, dist_max, Nbin+1)
+    r_out = r_in + (np.roll(r_in, -1) - r_in)
+    r_in  = r_in[0:-1]
+    r_out = r_out[0:-1]
+
+    #----- Compute the profile
+    r_ctr = np.array([])
+    p     = np.array([])
+    err   = np.array([])
+    for i in range(Nbin):
+        # Get the map pixels in the bin
+        w_bin_rad =  (dist_map < r_out[i]) * (dist_map >= r_in[i])
+        w_bin_val = (stddev > 0) * (np.isnan(stddev) == False) * (np.isnan(image) == False)
+        w_bin     = w_bin_rad * w_bin_val
+        Npix_bin  = np.sum(w_bin)
+
+        # Gaussian case (mean x Npix_bin == counts in bin)
+        if Npix_bin > 0:
+            val     = np.sum((image/stddev**2)[w_bin]) / np.sum((1.0/stddev**2)[w_bin])
+            val_err = 1.0 / np.sqrt(np.sum((1.0/stddev**2)[w_bin]))
+        else:
+            val     = np.nan
+            val_err = np.nan
 
         # Append the bin values
         p       = np.append(p, val)
