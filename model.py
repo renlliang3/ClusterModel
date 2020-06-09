@@ -775,6 +775,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                 raise TypeError("R_norm should be homogeneous to kpc")
             
             if value['X'] < 0:
+                print('value  is '+str(value['X']))
                 raise ValueError("The cosmic ray to thermal pressure ratio X should be >= 0")
             
             if value['R_norm'].to_value('kpc') <= 0:
