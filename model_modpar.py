@@ -1122,6 +1122,9 @@ class Modpar(object):
                 if self._silent == False:
                     print('WARNING: User model interpolated beyond the provided range!')
 
+            # Correct for nan (correspond to user_p == 0 in log)
+            pitpl_r[np.isnan(pitpl_r)] = 0
+                    
             # Correct for negative value
             pitpl_r[pitpl_r<0] = 0
             
@@ -1212,6 +1215,9 @@ class Modpar(object):
                 if self._silent == False:
                     print('WARNING: User model interpolated beyond the provided range!')
 
+            # Correct for nan (correspond to user_s == 0 in log)
+            sitpl_e[np.isnan(sitpl_e)] = 0
+                    
             # Correct for negative value
             sitpl_e[sitpl_e<0] = 0
 

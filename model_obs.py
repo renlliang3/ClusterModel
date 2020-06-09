@@ -1434,7 +1434,7 @@ class Observables(object):
         r3d = model_tools.sampling_array(Rmin3d*0.9, Rmax3d*1.1, NptPd=self._Npt_per_decade_integ, unit=True)
         los = model_tools.sampling_array(Rmin_los, NR500_los*self._R500, NptPd=self._Npt_per_decade_integ, unit=True)
         dN_dVdt_E = self.get_rate_synchrotron(eng0_rf, r3d).flatten()
-        
+
         # Compute integral over l.o.s.
         dN_dVdt_E_proj = model_tools.los_integration_1dfunc(dN_dVdt_E, r3d, radius, los)
         dN_dVdt_E_proj[radius > self._R_truncation] = 0
