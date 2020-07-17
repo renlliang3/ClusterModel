@@ -132,7 +132,7 @@ class Cluster(Admin, Modpar, Physics, Observables, Plots):
                  M500=1e15*u.Unit('Msun'),
                  cosmology=astropy.cosmology.Planck15,
                  silent=False,
-                 output_dir='./ClusterModel',
+                 output_dir='./MINOS_output',
     ):
         """
         Initialize the cluster object. Several attributes of the class cannot 
