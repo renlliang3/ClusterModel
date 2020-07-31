@@ -1,3 +1,7 @@
+# Important note:
+In order to match external constraints (and improve the module), this page will now become obsolete. Instead, please use https://github.com/remi-adam/minot, which is compatible with both python 2 and 3, and pip installable.
+
+
 # MINOS: Modeling of the ICM Non-thermal content and Observable prediction Software
 Software dedicated to provide a model of the thermal and non-thermal diffuse components in the clusters, multi-wavelenght modeling and observable predictions.
                                                             
